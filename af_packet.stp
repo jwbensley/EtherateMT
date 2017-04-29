@@ -1,0 +1,399 @@
+// Not all functions are referenced below are called, that is intentional to verify that they are not being called.
+
+
+// Provide timestamps:
+
+function print_ts() {
+  ts = gettimeofday_us();
+  printf("[%10d.%06d] ", ts/1000000, ts%1000000);
+}
+
+
+
+/*
+ Functions outside of af_packet.c
+*/
+
+probe kernel.function("dev_queue_xmit") { 
+    print_ts();
+    printf("dev_queue_xmit\n");
+}
+
+probe kernel.function("dev_hard_start_xmit") { 
+    print_ts();
+    printf("dev_hard_start_xmit\n");
+}
+
+probe kernel.function("ktime_to_timespec_cond") { 
+    print_ts();
+    printf("ktime_to_timespec_cond\n");
+}
+
+
+
+/*
+ af_packet.c Init functions
+*/
+
+// This is function blacklisted...
+/*
+probe kernel.function("packet_init") { 
+    print_ts();
+    printf("tpacket_snd\n");
+}
+*/
+
+probe kernel.function("packet_create") { 
+    print_ts();
+    printf("packet_create\n");
+}
+
+probe kernel.function("register_prot_hook") { 
+    print_ts();
+    printf("register_prot_hook\n");
+}
+
+probe kernel.function("packet_release") { 
+    print_ts();
+    printf("packet_release\n");
+}
+
+probe kernel.function("packet_setsockopt") { 
+    print_ts();
+    printf("packet_setsockopt\n");
+}
+
+probe kernel.function("packet_getsockopt") { 
+    print_ts();
+    printf("packet_getsockopt\n");
+}
+
+/*
+probe kernel.function("packet_use_direct_xmit") { 
+    print_ts();
+    printf("packet_use_direct_xmit\n");
+}
+*/
+
+probe kernel.function("packet_set_ring") { 
+    print_ts();
+    printf("packet_set_ring\n");
+}
+
+probe kernel.function("packet_bind") { 
+    print_ts();
+    printf("packet_bind\n");
+}
+
+probe kernel.function("packet_do_bind") { 
+    print_ts();
+    printf("packet_do_bind\n");
+}
+
+probe kernel.function("__fanout_link") { 
+    print_ts();
+    printf("__fanout_link\n");
+}
+
+
+
+/*
+ af_packet.c Transmit functions
+*/
+
+probe kernel.function("packet_sendmsg_spkt") { 
+    print_ts();
+    printf("packet_sendmsg_spkt\n");
+}
+
+probe kernel.function("packet_sendmsg") { 
+    print_ts();
+    printf("packet_sendmsg\n");
+}
+
+probe kernel.function("tpacket_snd") { 
+    print_ts();
+    printf("tpacket_snd\n");
+}
+
+probe kernel.function("tpacket_fill_skb") { 
+    print_ts();
+    printf("tpacket_fill_skb\n");
+}
+
+probe kernel.function("__packet_get_status") { 
+    print_ts();
+    printf("__packet_get_status\n");
+}
+
+probe kernel.function("packet_lookup_frame") { 
+    print_ts();
+    printf("packet_lookup_frame\n");
+}
+
+probe kernel.function("packet_pick_tx_queue") { 
+    print_ts();
+    printf("packet_pick_tx_queue\n");
+}
+
+probe kernel.function("__packet_pick_tx_queue") { 
+    print_ts();
+    printf("__packet_pick_tx_queue\n");
+}
+
+probe kernel.function("__packet_set_status") { 
+    print_ts();
+    printf("__packet_set_status\n");
+}
+
+probe kernel.function("packet_direct_xmit") { 
+    print_ts();
+    printf("packet_direct_xmit\n");
+}
+
+probe kernel.function("tpacket_destruct_skb") { 
+    print_ts();
+    printf("tpacket_destruct_skb\n");
+}
+
+probe kernel.function("__packet_set_timestamp") { 
+    print_ts();
+    printf("__packet_set_timestamp\n");
+}
+
+probe kernel.function("tpacket_get_timestamp") { 
+    print_ts();
+    printf("tpacket_get_timestamp\n");
+}
+
+probe kernel.function("packet_increment_head") { 
+    print_ts();
+    printf("packet_increment_head\n");
+}
+
+probe kernel.function("packet_current_frame") { 
+    print_ts();
+    printf("packet_current_frame\n");
+}
+
+probe kernel.function("netdev_start_xmit") { 
+    print_ts();
+    printf("netdev_start_xmit\n");
+}
+
+probe kernel.function("__netdev_start_xmit") { 
+    print_ts();
+    printf("__netdev_start_xmit\n");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// af_packet.c Receive functions:
+
+probe kernel.function("packet_rcv_fanout") { 
+    print_ts();
+    printf("packet_rcv_fanout\n");
+}
+
+probe kernel.function("packet_rcv") { 
+    print_ts();
+    printf("packet_rcv\n");
+}
+
+probe kernel.function("tpacket_rcv") { 
+    print_ts();
+    printf("tpacket_rcv\n");
+}
+
+probe kernel.function("packet_recvmsg") { 
+    print_ts();
+    printf("packet_recvmsg\n");
+}
+
+
+
+
+// These aren't being called it seems?
+
+probe kernel.function("fanout_add") { 
+    print_ts();
+    printf("fanout_add\n");
+}
+
+probe kernel.function("packet_mm_open") { 
+    print_ts();
+    printf("packet_mm_open\n");
+}
+
+probe kernel.function("tpacket_set_protocol") { 
+    print_ts();
+    printf("tpacket_set_protocol\n");
+}
+
+probe kernel.function("packet_alloc_skb") { 
+    print_ts();
+    printf("packet_alloc_skb\n");
+}
+
+probe kernel.function("packet_snd") { 
+    print_ts();
+    printf("packet_snd\n");
+}
+
+
+
+/*
+
+Reference of available functions to SystemTap:
+
+bensley@ubuntu16:~/c/packet_mmap$ stap -l 'kernel.function("*")' | grep af_pack
+kernel.function("__fanout_link@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1492")
+kernel.function("__fanout_set_data_bpf@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1540")
+kernel.function("__fanout_unlink@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1503")
+kernel.function("__packet_get_status@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:419")
+kernel.function("__packet_lookup_frame_in_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1040")
+kernel.function("__packet_pick_tx_queue@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:314")
+kernel.function("__packet_rcv_has_room@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1264")
+kernel.function("__packet_set_status@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:396")
+kernel.function("__packet_set_timestamp@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:457")
+kernel.function("__prb_previous_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1146")
+kernel.function("__tpacket_has_room@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1238")
+kernel.function("__tpacket_v3_has_room@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1251")
+kernel.function("__unregister_prot_hook@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:361")
+kernel.function("_prb_refresh_rx_retire_blk_timer@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:640")
+kernel.function("alloc_one_pg_vec_page@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4015")
+kernel.function("alloc_pg_vec@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4040")
+kernel.function("fanout_add@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1624")
+kernel.function("fanout_demux_bpf@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1415")
+kernel.function("fanout_demux_cpu@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1355")
+kernel.function("fanout_demux_hash@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1339")
+kernel.function("fanout_demux_lb@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1346")
+kernel.function("fanout_demux_qm@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1408")
+kernel.function("fanout_demux_rnd@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1362")
+kernel.function("fanout_demux_rollover@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1369")
+kernel.function("fanout_flow_is_huge@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1325")
+kernel.function("fanout_init_data@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1527")
+kernel.function("fanout_release@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1719")
+kernel.function("fanout_release_data@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1615")
+kernel.function("fanout_set_data@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1602")
+kernel.function("fanout_set_data_cbpf@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1555")
+kernel.function("fanout_set_data_ebpf@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1577")
+kernel.function("free_pg_vec@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3997")
+kernel.function("init_prb_bdqc@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:603")
+kernel.function("match_fanout_group@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1519")
+kernel.function("packet_alloc_pending@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1217")
+kernel.function("packet_alloc_skb@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2601")
+kernel.function("packet_bind@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3017")
+kernel.function("packet_bind_spkt@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3000")
+kernel.function("packet_cached_dev_assign@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:298")
+kernel.function("packet_cached_dev_get@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:285")
+kernel.function("packet_cached_dev_reset@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:304")
+kernel.function("packet_create@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3045")
+kernel.function("packet_current_frame@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:510")
+kernel.function("packet_current_rx_frame@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1102")
+kernel.function("packet_dec_pending@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1197")
+kernel.function("packet_dev_mc@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3353")
+kernel.function("packet_dev_mclist_delete@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3383")
+kernel.function("packet_direct_xmit@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:249")
+kernel.function("packet_do_bind@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2910")
+kernel.function("packet_extra_vlan_len_allowed@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1743")
+kernel.function("packet_flush_mclist@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3479")
+kernel.function("packet_free_pending@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1228")
+kernel.function("packet_getname@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3322")
+kernel.function("packet_getname_spkt@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3301")
+kernel.function("packet_getsockopt@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3723")
+kernel.function("packet_inc_pending@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1192")
+kernel.function("packet_increment_head@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1187")
+kernel.function("packet_increment_rx_head@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1164")
+kernel.function("packet_ioctl@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3889")
+kernel.function("packet_lookup_frame@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:490")
+kernel.function("packet_mc_add@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3398")
+kernel.function("packet_mc_drop@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3453")
+kernel.function("packet_mm_close@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3982")
+kernel.function("packet_mm_open@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3972")
+kernel.function("packet_mmap@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4218")
+kernel.function("packet_net_exit@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4413")
+kernel.function("packet_net_init@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4402")
+kernel.function("packet_notifier@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3837")
+kernel.function("packet_pick_tx_queue@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:319")
+kernel.function("packet_poll@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3942")
+kernel.function("packet_previous_frame@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1179")
+kernel.function("packet_previous_rx_frame@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1154")
+kernel.function("packet_rcv@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1978")
+kernel.function("packet_rcv_fanout@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1436")
+kernel.function("packet_rcv_has_room@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1295")
+kernel.function("packet_rcv_spkt@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1761")
+kernel.function("packet_read_pending@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1202")
+kernel.function("packet_recvmsg@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3125")
+kernel.function("packet_release@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2844")
+kernel.function("packet_sendmsg@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2828")
+kernel.function("packet_sendmsg_spkt@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1833")
+kernel.function("packet_seq_next@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4343")
+kernel.function("packet_seq_open@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4386")
+kernel.function("packet_seq_show@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4355")
+kernel.function("packet_seq_start@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4334")
+kernel.function("packet_seq_stop@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4349")
+kernel.function("packet_set_ring@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:4065")
+kernel.function("packet_setsockopt@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:3501")
+kernel.function("packet_snd@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2625")
+kernel.function("packet_sock_destruct@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1310")
+kernel.function("pgv_to_page@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:389")
+kernel.function("prb_calc_retire_blk_tmo@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:554")
+kernel.function("prb_clear_blk_fill_status@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:978")
+kernel.function("prb_clear_rxhash@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:990")
+kernel.function("prb_close_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:786")
+kernel.function("prb_del_retire_blk_timer@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:517")
+kernel.function("prb_dispatch_next_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:915")
+kernel.function("prb_fill_curr_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1022")
+kernel.function("prb_fill_rxhash@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:984")
+kernel.function("prb_fill_vlan_info@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:996")
+kernel.function("prb_flush_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:743")
+kernel.function("prb_freeze_queue@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:900")
+kernel.function("prb_init_blk_timer@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:536")
+kernel.function("prb_init_ft_ops@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:597")
+kernel.function("prb_lookup_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1122")
+kernel.function("prb_open_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:840")
+kernel.function("prb_previous_blk_num@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1135")
+kernel.function("prb_retire_current_block@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:940")
+kernel.function("prb_retire_rx_blk_timer_expired@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:670")
+kernel.function("prb_run_all_ft_ops@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1010")
+kernel.function("prb_setup_retire_blk_timer@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:546")
+kernel.function("prb_shutdown_retire_blk_timer@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:522")
+kernel.function("prb_thaw_queue@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:828")
+kernel.function("register_prot_hook@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:339")
+kernel.function("run_filter@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:1951")
+kernel.function("tpacket_destruct_skb@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2314")
+kernel.function("tpacket_fill_skb@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2341")
+kernel.function("tpacket_get_timestamp@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:441")
+kernel.function("tpacket_rcv@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2090")
+kernel.function("tpacket_set_protocol@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2332")
+kernel.function("tpacket_snd@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:2463")
+kernel.function("unregister_prot_hook@/build/linux-wXdoVv/linux-4.4.0/net/packet/af_packet.c:381")
+
+
+*/
