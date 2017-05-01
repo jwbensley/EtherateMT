@@ -7,6 +7,7 @@
 #include <arpa/inet.h>       // htons()
 #include <inttypes.h>        // PRIuN
 #include <sys/ioctl.h>       // ioctl()
+#include <math.h>            // floor()
 #include <sys/mman.h>        // mmap()
 #include <poll.h>            // poll()
 #include <pthread.h>         // pthread_*()
@@ -61,6 +62,55 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
         return EXIT_FAILURE;
     }
 
+    ///// Force the SO_SNDBUF?
+    if (thd_opt->sk_mode == SKT_TX) {
+
+        int32_t read_size;
+        socklen_t read_len = sizeof(read_size);
+        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &read_size, &read_len) < 0) {
+            perror("getsockopt: SO_SNDBUF");
+            return EXIT_FAILURE;
+        }
+
+        int32_t send_size = thd_opt->block_sz * thd_opt->block_nr; // 4096 * 256 // Make this automatic? block_sz*block_nr
+
+        if (read_size < send_size) {
+
+            printf("Original send buff size = %d\n", read_size);
+            printf("Desired send buff size = %d\n", send_size);
+
+
+            if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &send_size, sizeof(send_size)) < 0) {
+                perror("setsockopt: SO_SNDBUF");
+                return EXIT_FAILURE;
+            }
+            if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &read_size, &read_len) < 0) {
+                perror("getsockopt: SO_SNDBUF");
+                return EXIT_FAILURE;
+            }
+            printf("New send buff size = %d\n", read_size);
+
+
+            if (read_size != send_size) {
+                if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE, &send_size, sizeof(send_size))<0) {
+                    perror("setsockopt: SO_SNDBUFFORCE");
+                    return EXIT_FAILURE;
+                }
+                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &read_size, &read_len) < 0) {
+                    perror("getsockopt: SO_SNDBUF");
+                    return EXIT_FAILURE;
+                  }
+                printf("Forced send buff size = %d\n", read_size);
+                if (read_size != send_size) {
+                    printf("still smaller than desired\n");
+                    //return EXIT_FAILURE;
+                }
+            }
+
+        }
+
+    }
+
 
     // Bypass the kernel qdisc layer and push packets directly to the driver,
     // (packet are not buffered, tc disciplines are ignored, Tx support only).
@@ -81,16 +131,6 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
     }
 
 
-    // Ensure software timestamping is disabled
-    static const int32_t sock_timestamp = 0;
-    int32_t sock_ts_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_TIMESTAMP, &sock_timestamp, sizeof(sock_timestamp));
-
-    if (sock_ts_ret == -1) {
-        perror("Can't enable QDISC bypass on socket");
-        return EXIT_FAILURE;
-    }
-
-
     // Enable packet loss, only supported on Tx
     if (thd_opt->sk_mode == SKT_TX) {
         
@@ -106,6 +146,7 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
 
     // Set the TPACKET version, v2 for Tx and v3 for Rx
     // (v2 supports packet level send(), v3 supports block level read())
+    ///// Tx using TPACKET v3 is now in Kernel 4.11 !
     int32_t sock_pkt_ver = -1;
 
     if(thd_opt->sk_mode == SKT_TX) {
@@ -122,41 +163,72 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
     }
 
 
+
+
+    // Ensure software timestamping is disabled
+    static const int32_t sock_timestamp = 0;
+    int32_t sock_ts_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_TIMESTAMP, &sock_timestamp, sizeof(sock_timestamp));
+
+    if (sock_ts_ret == -1) {
+        perror("Can't disable timestamps on socket");
+        return EXIT_FAILURE;
+    }
+
+
+    // Request HW timestamping 
+    /*
+      memset (&hwconfig, 0, sizeof (hwconfig));
+      hwconfig.tx_type = HWTSTAMP_TX_OFF;
+      hwconfig.rx_filter = HWTSTAMP_FILTER_ALL;
+
+      timesource |= SOF_TIMESTAMPING_RAW_HARDWARE;
+      timesource |= SOF_TIMESTAMPING_SYS_HARDWARE;
+
+      memset (&ifr, 0, sizeof (ifr));
+      strncpy (ifr.ifr_name, netdev, sizeof (ifr.ifr_name));
+      ifr.ifr_data = (void *) &hwconfig;
+      ret = ioctl (fd, SIOCSHWTSTAMP, &ifr);
+      if (ret < 0)
+        {
+          perror ("ioctl SIOCSHWTSTAMP");
+          // HW timestamps aren't support so will fall back to software
+    }
+
+      err =
+        setsockopt (fd, SOL_PACKET, PACKET_TIMESTAMP, &timesource,
+            sizeof (timesource));
+      if (err < 0)
+        {
+          perror ("setsockopt PACKET_TIMESTAMP");
+          exit (1);
+    }
+    */
+
+
+
     memset(&thd_opt->tpacket_req,  0, sizeof(struct tpacket_req));
     memset(&thd_opt->tpacket_req3, 0, sizeof(struct tpacket_req3));
-
-    //thd_opt->block_sz = 4096; // (8388608 / 2048 = 4096 frames packets per block)
-    // Could equal frame_size+TPACKET2_HDRLEN ?
-    //thd_opt->block_nr = 256;
-    //thd_opt->block_frame_sz = 4096;
-    // frame_nr == (blocksiz * blocknum) / framesiz == 524288 frames in all bocks
-
-    int32_t page_size = getpagesize();
-    if (thd_opt->block_sz % page_size != 0) printf("Block size is not a multiple of getpagesize() (%d)!\n", getpagesize());
-    if (thd_opt->block_frame_sz  < TPACKET2_HDRLEN) printf("Frame size is less than TPACKET2_HDRLEN (%lu)!\n", TPACKET2_HDRLEN);
-    if (thd_opt->block_frame_sz % TPACKET_ALIGNMENT != 0) printf("Frame size (%d) is not a multiple of TPACKET_ALIGNMENT (%d)!\n", thd_opt->block_frame_sz, TPACKET_ALIGNMENT);
 
     int32_t sock_mmap_ring = -1;
     if (thd_opt->sk_mode == SKT_TX) {
 
         thd_opt->tpacket_req.tp_block_size = thd_opt->block_sz;
-        thd_opt->tpacket_req.tp_frame_size = thd_opt->block_sz;
+        thd_opt->tpacket_req.tp_frame_size = thd_opt->block_frm_sz;
         thd_opt->tpacket_req.tp_block_nr   = thd_opt->block_nr;
-        // Allocate per-frame blocks in Tx mode (TPACKET_V2)
-        thd_opt->tpacket_req.tp_frame_nr   = thd_opt->block_nr;
+        thd_opt->tpacket_req.tp_frame_nr   = thd_opt->frame_nr;
 
-        sock_mmap_ring = setsockopt(thd_opt->sock_fd, SOL_PACKET , PACKET_TX_RING , (void*)&thd_opt->tpacket_req , sizeof(struct tpacket_req));
+        sock_mmap_ring = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_TX_RING, (void*)&thd_opt->tpacket_req, sizeof(struct tpacket_req));
 
     } else {
 
         thd_opt->tpacket_req3.tp_block_size = thd_opt->block_sz;
-        thd_opt->tpacket_req3.tp_frame_size = thd_opt->block_frame_sz;
+        thd_opt->tpacket_req3.tp_frame_size = thd_opt->block_frm_sz;
         thd_opt->tpacket_req3.tp_block_nr   = thd_opt->block_nr;
-        thd_opt->tpacket_req3.tp_frame_nr   = (thd_opt->block_sz * thd_opt->block_nr) / thd_opt->block_frame_sz;
+        thd_opt->tpacket_req3.tp_frame_nr   = thd_opt->frame_nr; ///// (thd_opt->block_sz * thd_opt->block_nr) / thd_opt->block_frm_sz;
         thd_opt->tpacket_req3.tp_retire_blk_tov   = 1; ////// Timeout in msec, what does this do?
         thd_opt->tpacket_req3.tp_feature_req_word = 0; //TP_FT_REQ_FILL_RXHASH;  ///// What does this do?
 
-        sock_mmap_ring = setsockopt(thd_opt->sock_fd, SOL_PACKET , PACKET_RX_RING , (void*)&thd_opt->tpacket_req3 , sizeof(thd_opt->tpacket_req3));
+        sock_mmap_ring = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_RX_RING, (void*)&thd_opt->tpacket_req3, sizeof(thd_opt->tpacket_req3));
     }
     
     if (sock_mmap_ring == -1) {
@@ -200,7 +272,7 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
 
 
     // Join this socket to the fanout group
-    ///// Add if for just one thread to not use fanout
+    ///// Add if(){} for just one thread to not use fanout?
     
     uint16_t fanout_type = PACKET_FANOUT_CPU; 
     uint32_t fanout_arg = (thd_opt->fanout_group_id | (fanout_type << 16));
@@ -320,8 +392,8 @@ void *packet_tx_mmap(void* thd_opt_p) {
 
             hdr = (void*)(thd_opt->mmap_buf + (thd_opt->tpacket_req.tp_frame_size * i));
             data = (uint8_t*)(hdr + TPACKET_ALIGN(TPACKET2_HDRLEN));
-            memcpy(data, thd_opt->tx_buffer, thd_opt->frame_size);
-            hdr->tp_len = thd_opt->frame_size;
+            memcpy(data, thd_opt->tx_buffer, thd_opt->frame_sz);
+            hdr->tp_len = thd_opt->frame_sz;
             hdr->tp_status = TP_STATUS_SEND_REQUEST;
 
         }
@@ -335,14 +407,15 @@ void *packet_tx_mmap(void* thd_opt_p) {
         //printf("Poll ret: %d\n", poll_ret);
         */
 
-        tx_bytes = sendto(thd_opt->sock_fd, NULL, 0, 0, NULL, 0);
+        ///// Any difference on > 4.1 kernel with real NIC?
+        tx_bytes = sendto(thd_opt->sock_fd, NULL, 0, MSG_DONTWAIT, NULL, 0);
 
         if (tx_bytes == -1) {
             perror("sendto error");
             exit(EXIT_FAILURE);
         }
         
-        thd_opt->tx_pkts  += thd_opt->tpacket_req.tp_frame_nr;
+        thd_opt->tx_pkts  += (tx_bytes / thd_opt->tpacket_req.tp_frame_nr);
         thd_opt->tx_bytes += tx_bytes;
 
 
@@ -404,14 +477,19 @@ int32_t setup_socket(struct thd_opt *thd_opt) {
     // Bypass the kernel qdisc layer and push packets directly to the driver,
     // (packet are not buffered, tc disciplines are ignored, Tx support only)
     if (thd_opt->sk_mode == SKT_TX) {
-        
-        static const int32_t sock_qdisc_bypass = 1;
-        int32_t sock_qdisc_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
 
-        if (sock_qdisc_ret == -1) {
-            perror("Can't enable QDISC bypass on socket");
-            return EXIT_FAILURE;
-        }
+        #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
+            
+            static const int32_t sock_qdisc_bypass = 1;
+            int32_t sock_qdisc_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
+
+            if (sock_qdisc_ret == -1) {
+                perror("Can't enable QDISC bypass on socket");
+                return EXIT_FAILURE;
+            }
+
+        #endif
+        
     }
 
 
@@ -466,7 +544,7 @@ void *packet_rx(void* thd_opt_p) {
 
     while(1) {
 
-        rx_bytes = read(thd_opt->sock_fd, thd_opt->rx_buffer, frame_size_max);
+        rx_bytes = read(thd_opt->sock_fd, thd_opt->rx_buffer, frame_sz_max);
         
         if (rx_bytes == -1) {
             perror("Socket Rx error");
@@ -495,7 +573,7 @@ void *packet_tx(void* thd_opt_p) {
     while(1) {
 
         tx_bytes = sendto(thd_opt->sock_fd, thd_opt->tx_buffer,
-                          thd_opt->frame_size, 0,
+                          thd_opt->frame_sz, 0,
                           (struct sockaddr*)&thd_opt->bind_addr,
                           sizeof(thd_opt->bind_addr));
 
@@ -549,9 +627,105 @@ int main(int argc, char *argv[]) {
         printf("Running in Tx mode\n");
     }
 
+    printf("Frame size set to %d\n", etherate.frm_opt.frame_sz);
+
+    ////// Move this to seperate function?
+    if (etherate.app_opt.mode == SKT_TX) {
+
+        etherate.frm_opt.block_frm_sz = etherate.frm_opt.frame_sz + TPACKET2_HDRLEN;
+
+        // The frame in the ring block must also contain a header (seperate to the frame header)
+        if (etherate.frm_opt.block_frm_sz < TPACKET2_HDRLEN) {
+            printf("Block frame size (%d) is less than TPACKET2_HDRLEN (%lu)!\n", etherate.frm_opt.block_frm_sz, TPACKET2_HDRLEN);
+            exit(EXIT_FAILURE);
+        }
+
+        // Blocks must be an integer multiple of pages
+        if (etherate.frm_opt.block_sz < getpagesize()) {
+            printf("Block size (%d) is less than page size (%d)! ", etherate.frm_opt.block_sz, getpagesize());
+            etherate.frm_opt.block_sz = getpagesize();
+            printf("Padded to %d.\n", getpagesize());
+        }
+
+        // The block frame size must be a multiple of TPACKET_ALIGNMENT (16) AND a multiple of the block size,
+        // and blocks must be an integer number of pages:
+        uint16_t tpacket_block_align = getpagesize() / TPACKET_ALIGNMENT;
+
+        if (etherate.frm_opt.block_frm_sz % tpacket_block_align != 0) {
+            printf("Block frame size (%d) is not a multiple of TPACKET_ALIGN (%d) and the block size (%d)! ", etherate.frm_opt.block_frm_sz, tpacket_block_align, etherate.frm_opt.block_sz);
+            uint32_t base = (etherate.frm_opt.block_frm_sz / tpacket_block_align) + 1;
+            etherate.frm_opt.block_frm_sz = (base * tpacket_block_align);
+            printf("Padded to %d.\n", etherate.frm_opt.block_frm_sz);
+        }
+
+        // Blocks must contain at least 1 frame, frames can not be fragmented across blocks
+        if (etherate.frm_opt.block_sz < etherate.frm_opt.block_frm_sz) {
+            printf("Block size (%d) is less than block frame size (%d)! ", etherate.frm_opt.block_sz, etherate.frm_opt.block_frm_sz);
+            etherate.frm_opt.block_sz = etherate.frm_opt.block_frm_sz;
+
+            // Check again in case it is no longer page aligned
+            if (etherate.frm_opt.block_sz % getpagesize() != 0) {
+                uint32_t base = (etherate.frm_opt.block_sz / getpagesize()) + 1;
+                etherate.frm_opt.block_sz = (base * getpagesize());
+            }
+            printf("Padded to %d.\n", etherate.frm_opt.block_sz);
+        }
+
+        // The following integer math occurs in af_packet.c, the remainder is lost so the number
+        // of frames per block MUST be either 1 or a power of 2:
+        // packet_set_ring(): rb->block_frm_nr = req->tp_block_size / req->tp_frame_size;
+        // packet_set_ring(): Checks if (block_frm_nr == 0) return EINVAL;
+        // packet_set_ring(): checks if (block_frm_nr * tp_block_nr != tp_frame_nr) return EINVAL;
+        uint32_t block_frm_nr = etherate.frm_opt.block_sz / etherate.frm_opt.block_frm_sz;
+        uint32_t next_power = 0;
+        uint32_t is_power_of_two = (block_frm_nr != 0) && ((block_frm_nr & (block_frm_nr - 1)) == 0 );
+
+        if ((block_frm_nr != 1) && (is_power_of_two != 1)) {
+            printf("Frames per block: %u. Frames per block must be 1 or a power of 2! ", block_frm_nr);
+            next_power = block_frm_nr;
+            next_power--;
+            next_power |= next_power >> 1;
+            next_power |= next_power >> 2;
+            next_power |= next_power >> 4;
+            next_power |= next_power >> 8;
+            next_power |= next_power >> 16;
+            next_power++;
+
+            etherate.frm_opt.block_sz = next_power * etherate.frm_opt.block_frm_sz;            
+
+            if (etherate.frm_opt.block_sz % getpagesize() != 0) {
+                uint32_t base = (etherate.frm_opt.block_sz / getpagesize()) + 1;
+                etherate.frm_opt.block_sz = (base * getpagesize());
+            }
+
+            etherate.frm_opt.block_frm_sz = etherate.frm_opt.block_sz / next_power;
+            block_frm_nr = etherate.frm_opt.block_sz / etherate.frm_opt.block_frm_sz;
+
+            printf("Frames per block increased to (%d) and block size increased to %u.\n", block_frm_nr, etherate.frm_opt.block_sz);
+            printf("Block frame size increased to %u to evenly fill block.\n", etherate.frm_opt.block_frm_sz);
+
+        }
+
+        if (etherate.frm_opt.block_frm_sz % tpacket_block_align != 0) {
+            printf("Block frame size (%d) is not a multiple of tpacket_block_align (%d)! ", etherate.frm_opt.block_frm_sz, tpacket_block_align);
+            uint32_t base = (etherate.frm_opt.block_frm_sz / tpacket_block_align) + 1;
+            etherate.frm_opt.block_frm_sz = (base * tpacket_block_align);
+            printf("Padded to %d.\n", etherate.frm_opt.block_frm_sz);
+        }
+
+        etherate.frm_opt.frame_nr = (etherate.frm_opt.block_sz * etherate.frm_opt.block_nr) / etherate.frm_opt.block_frm_sz;
+        printf("Frames per block %d, block number %d, frames in ring %d\n", block_frm_nr, etherate.frm_opt.block_nr, etherate.frm_opt.frame_nr);
+
+        if ((block_frm_nr * etherate.frm_opt.block_nr) != etherate.frm_opt.frame_nr) {
+            printf("Frames per block (%d) * block number (%d) != frame number in ring (%d)!\n", block_frm_nr, etherate.frm_opt.block_nr, etherate.frm_opt.frame_nr);
+        }
+
+    }
+
+
     // Fill the test frame buffer with random data
     if (etherate.frm_opt.custom_frame == 0) {
-        for (uint16_t i = 0; i < etherate.frm_opt.frame_size; i += 1)
+        for (uint16_t i = 0; i < etherate.frm_opt.frame_sz; i += 1)
         {
             etherate.frm_opt.tx_buffer[i] = (uint8_t)((255.0*rand()/(RAND_MAX+1.0)));
         }
@@ -583,18 +757,19 @@ int main(int argc, char *argv[]) {
         pthread_attr_setschedparam(&t_attr_fill,&para_fill);
         */
 
-        ///// "set up thread options"
-        etherate.thd_opt[thread].block_nr = etherate.frm_opt.block_nr;
-        etherate.thd_opt[thread].block_sz = etherate.frm_opt.block_sz;
-        etherate.thd_opt[thread].block_frame_sz = etherate.frm_opt.block_frame_sz;
+        // Set up and copy per-thread settings
+        etherate.thd_opt[thread].block_nr        = etherate.frm_opt.block_nr;
+        etherate.thd_opt[thread].block_sz        = etherate.frm_opt.block_sz;
+        etherate.thd_opt[thread].block_frm_sz    = etherate.frm_opt.block_frm_sz;
+        etherate.thd_opt[thread].frame_nr        = etherate.frm_opt.frame_nr;
         etherate.thd_opt[thread].fanout_group_id = etherate.app_opt.fanout_group_id;
-        etherate.thd_opt[thread].if_index = etherate.sk_opt.if_index;
-        etherate.thd_opt[thread].tx_buffer = etherate.frm_opt.tx_buffer;
-        etherate.thd_opt[thread].frame_size = etherate.frm_opt.frame_size;
-        etherate.thd_opt[thread].frame_size_max = frame_size_max;
-        etherate.thd_opt[thread].rx_buffer = (uint8_t*)calloc(frame_size_max,1);
-        etherate.thd_opt[thread].tx_buffer = (uint8_t*)calloc(frame_size_max,1);
-        memcpy(etherate.thd_opt[thread].tx_buffer, etherate.frm_opt.tx_buffer, frame_size_max);
+        etherate.thd_opt[thread].if_index        = etherate.sk_opt.if_index;
+        etherate.thd_opt[thread].tx_buffer       = etherate.frm_opt.tx_buffer;
+        etherate.thd_opt[thread].frame_sz        = etherate.frm_opt.frame_sz;
+        etherate.thd_opt[thread].frame_sz_max    = frame_sz_max;
+        etherate.thd_opt[thread].rx_buffer       = (uint8_t*)calloc(frame_sz_max,1);
+        etherate.thd_opt[thread].tx_buffer       = (uint8_t*)calloc(frame_sz_max,1);
+        memcpy(etherate.thd_opt[thread].tx_buffer, etherate.frm_opt.tx_buffer, frame_sz_max);
 
         ///// Perhaps get the thread to set its own affinity first before it does anything else?
         if (etherate.app_opt.thread_sk_affin) {
@@ -627,7 +802,7 @@ int main(int argc, char *argv[]) {
 
         if (worker_thread_ret) {
           printf("Return code from worker pthread_create() is %d\n", worker_thread_ret);
-          exit(-1);
+          exit(EXIT_FAILURE);
         }
 
     }
@@ -654,7 +829,7 @@ int main(int argc, char *argv[]) {
 
         if (worker_join_ret) {
             printf("Return code from pthread_join() is %d\n", worker_join_ret);
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
         printf("Main: completed join with thread %d having a status of %ld\n", thread, (long)thread_status);
     }
@@ -667,7 +842,7 @@ int main(int argc, char *argv[]) {
     stats_thread_ret = pthread_join(stats_thread, &thread_status);
     if (stats_thread_ret) {
         printf("Return code from pthread_join() is %d\n", stats_thread_ret);
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
 
