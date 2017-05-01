@@ -1,13 +1,15 @@
-// Flags for socket direction
+// Flags for socket direction       ///// Bidi flag?
 #define SKT_RX 0
 #define SKT_TX 1
 
-static char const * const app_version = "MT 0.1.alpha 2017-03";
-uint32_t block_frame_sz = 4096;        // Default frame size in ring buffer (frame MTU + L2 headers + TPACKET headers)
-uint32_t block_nr       = 256;         // Default block number in ring number
-uint32_t block_sz       = 4096;        // Default block size for ring buffer
-uint16_t frame_size     = 1514;        // Default frame size with headers
-const uint16_t frame_size_max = 10000; // Max frame size with headers
+static char const * const app_version = "MT 0.2.alpha 2017-04";
+#define def_frame_sz 1514                       // Default Ethernet frame size at layer 2 excluding FCS
+#define def_block_frm_sz 2096                   // Default frame size in a block, data + TPACKET2_HDRLEN (52).
+#define def_block_sz getpagesize()              // Default block size
+#define def_block_nr 256                        // Default number of blocks per ring
+///// RENAME ALL OF THESE ^
+
+const uint16_t frame_sz_max = 10000; // Max frame size with headers
 
 
 
@@ -19,14 +21,15 @@ struct app_opt {
     uint8_t  thread_sk_affin; ///// Add CLI arg, try to avoid split NUMA node?
 };
 
-// Frame specific options
+// Frame and ring buffer options
 struct frm_opt {
-    uint32_t block_frame_sz;
-    uint32_t block_nr;
-    uint32_t block_sz;
-    uint8_t  custom_frame;
-    uint16_t frame_size;
-    uint8_t  *tx_buffer;
+    uint32_t block_frm_sz; // Size of frame in block (frame_sz + TPACKET2_HDRLEN)
+    uint32_t block_nr;     // Number of frame blocks per ring
+    uint32_t block_sz;     // Size of frame block in ring
+    uint8_t  custom_frame; // Bool to load a customer frame form file
+    uint16_t frame_sz;     // Frame size (layer 2 headers + layer 2 payload)
+    uint32_t frame_nr;     // Total number of frames in ring
+    uint8_t  *tx_buffer;   // Point to frame copied into ring
 };
 
 // Socket specific options
@@ -46,9 +49,10 @@ struct thd_opt {
     uint8_t* mmap_buf; ///// RENAME
     uint32_t block_sz;
     uint32_t block_nr;
-    uint32_t block_frame_sz; ///// RENAME
-    uint16_t frame_size;
-    uint16_t frame_size_max;
+    uint32_t block_frm_sz;
+    uint32_t frame_nr;
+    uint16_t frame_sz;
+    uint16_t frame_sz_max;
     uint8_t  *rx_buffer;
     uint8_t  *tx_buffer;
     struct   tpacket_req3 tpacket_req3; // v3 for Rx

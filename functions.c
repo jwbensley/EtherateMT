@@ -11,7 +11,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             if (strncmp(argv[i], "-a", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->frm_opt.block_frame_sz = (uint16_t)strtoul(argv[i+1], NULL, 0);
+                    etherate->frm_opt.block_frm_sz = (uint16_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing frame allocation size.\n"
@@ -70,28 +70,28 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                     }
 
                     int16_t file_ret = 0;
-                    etherate->frm_opt.frame_size = 0;
+                    etherate->frm_opt.frame_sz = 0;
                     while (file_ret != EOF &&
-                          (etherate->frm_opt.frame_size < frame_size_max)) {
+                          (etherate->frm_opt.frame_sz < frame_sz_max)) {
 
-                        file_ret = fscanf(frame_file, "%hhx", etherate->frm_opt.tx_buffer + etherate->frm_opt.frame_size);
+                        file_ret = fscanf(frame_file, "%hhx", etherate->frm_opt.tx_buffer + etherate->frm_opt.frame_sz);
 
                         if (file_ret == EOF) break;
 
-                        etherate->frm_opt.frame_size += 1;
+                        etherate->frm_opt.frame_sz += 1;
                     }
 
                     fclose(frame_file);
 
-                    printf("Using custom frame (%d octets loaded)\n", etherate->frm_opt.frame_size);
+                    printf("Using custom frame (%d octets loaded)\n", etherate->frm_opt.frame_sz);
 
                     etherate->frm_opt.custom_frame = 1;
 
-                    if (etherate->frm_opt.frame_size > 1514) {
+                    if (etherate->frm_opt.frame_sz > 1514) {
                         printf("WARNING: Make sure your device supports baby "
                                "giants or jumbo frames as required\n");
                     }
-                    if (etherate->frm_opt.frame_size < 46) {
+                    if (etherate->frm_opt.frame_sz < 46) {
                         printf("WARNING: Minimum ethernet payload is 46 bytes, "
                                "Linux may pad the frame out to 46 bytes\n");
                     }
@@ -110,19 +110,19 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
                 if (argc > (i+1)) {
 
-                    etherate->frm_opt.frame_size = (uint32_t)strtoul(argv[i+1], NULL, 0);
+                    etherate->frm_opt.frame_sz = (uint32_t)strtoul(argv[i+1], NULL, 0);
 
-                    if (etherate->frm_opt.frame_size > frame_size_max) {
-                        printf("The frame size is larger than the buffer max size"
-                               " (%d bytes)!\n", frame_size_max);
+                    if (etherate->frm_opt.frame_sz > frame_sz_max) {
+                        printf("The frame size is larger than the Etherate buffer size"
+                               " (%d bytes)!\n", frame_sz_max);
                         return EX_SOFTWARE;
                     }
 
-                    if (etherate->frm_opt.frame_size > 1514) {
+                    if (etherate->frm_opt.frame_sz > 1514) {
                         printf("WARNING: Make sure your device supports baby "
                                "giants or jumbo frames as required\n");
                     }
-                    if (etherate->frm_opt.frame_size < 46) {
+                    if (etherate->frm_opt.frame_sz < 46) {
                         printf("WARNING: Minimum ethernet payload is 46 bytes, "
                                "Linux may pad the frame out to 46 bytes\n");
                     }
@@ -233,12 +233,13 @@ void etherate_setup(struct etherate *etherate) {
     etherate->app_opt.fanout_group_id = getpid() & 0xffff; // All fanout worker threads will 
                                                            // belong to the same fanout group
     
-    etherate->frm_opt.block_frame_sz = block_frame_sz;
-    etherate->frm_opt.block_nr       = block_nr;
-    etherate->frm_opt.block_sz       = block_sz;
+    etherate->frm_opt.block_frm_sz   = def_block_frm_sz;
+    etherate->frm_opt.block_nr       = def_block_nr;
+    etherate->frm_opt.block_sz       = def_block_sz;
     etherate->frm_opt.custom_frame   = 0;
-    etherate->frm_opt.frame_size     = frame_size;
-    etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(frame_size_max,1); // Used to load a custom frame payload
+    etherate->frm_opt.frame_nr       = 0;
+    etherate->frm_opt.frame_sz       = def_frame_sz;
+    etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(frame_sz_max,1); // Used to load a custom frame payload
     
     etherate->sk_opt.if_index        = 0;
     memset(&etherate->sk_opt.if_name, 0, sizeof(IFNAMSIZ));
@@ -442,8 +443,8 @@ void print_usage () {
             "\t-r\tSwitch to Rx mode, the default is Tx.\n"
             "\t-V|--version Display version\n"
             "\t-h|--help Display this help text\n",
-            block_frame_sz, block_sz, block_nr,
-            frame_size, frame_size_max);
+            def_block_frm_sz, def_block_sz, def_block_nr,
+            def_frame_sz, frame_sz_max);
 
 }
 
