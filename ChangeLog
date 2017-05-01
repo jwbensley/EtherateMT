@@ -1,0 +1,15 @@
+-----EtherateMT 0.2 Alpha 2017-05
+
+[MAJOR] Working on frame / block / page / ring alignment, Tx was packing one frame per block, now multi-frames per blocks are now supported.
+
+
+
+-----EtherateMT 0.1 Alpha 2017-04
+
+[MAJOR] Initial write - very bugy, DO NOT USE!
+
+
+Changelog tags;
+[FEATURE]  == New working feature added to Etherate
+[MAJOR]    == Fixed a bug in Etherate code that affects the operations of the program or one of the test modes or test results
+[MINOR]    == Fixed a bug that doesn't stop Etherate from running properly like typos, formatting, documentation errata, code tidies
