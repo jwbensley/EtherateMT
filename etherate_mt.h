@@ -19,6 +19,7 @@ struct app_opt {
     uint16_t num_threads;
     uint8_t  mode; ///// Add bidi mode
     uint8_t  thread_sk_affin; ///// Add CLI arg, try to avoid split NUMA node?
+    uint8_t  verbose;
 };
 
 // Frame and ring buffer options

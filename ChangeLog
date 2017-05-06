@@ -1,6 +1,8 @@
 -----EtherateMT 0.2 Alpha 2017-05
 
-[MAJOR] Working on frame / block / page / ring alignment, Tx was packing one frame per block, now multi-frames per blocks are now supported.
+[MAJOR] Fixed frame / block / page / ring alignment, Tx was packing one frame per block, now multi-frames per blocks are now supported.
+
+[MINOR] Fixed socket sndbuf resize code
 
 
 

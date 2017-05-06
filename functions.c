@@ -83,7 +83,12 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
                     fclose(frame_file);
 
-                    printf("Using custom frame (%d octets loaded)\n", etherate->frm_opt.frame_sz);
+                    printf("Using custom frame (%d octets loaded):\n", etherate->frm_opt.frame_sz);
+
+                    for (int i = 0; i <= etherate->frm_opt.frame_sz; i += 1) {
+                        printf ("0x%hhx ", etherate->frm_opt.tx_buffer[i]);
+                    }
+                    printf("\n");
 
                     etherate->frm_opt.custom_frame = 1;
 
@@ -200,6 +205,10 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             }else if (strncmp(argv[i], "-r" ,2)==0)  {
                 etherate->app_opt.mode = 0; ///// Use global SK_TX?
 
+            // Enable verbose output
+            }else if (strncmp(argv[i], "-v" ,2)==0)  {
+                etherate->app_opt.verbose = 1; ///// Use global SK_TX?
+
 
             // Display version
             } else if (strncmp(argv[i], "-V", 2)==0 ||
@@ -232,6 +241,7 @@ void etherate_setup(struct etherate *etherate) {
     etherate->app_opt.thread_sk_affin = 0;
     etherate->app_opt.fanout_group_id = getpid() & 0xffff; // All fanout worker threads will 
                                                            // belong to the same fanout group
+    etherate->app_opt.verbose         = 0;
     
     etherate->frm_opt.block_frm_sz   = def_block_frm_sz;
     etherate->frm_opt.block_nr       = def_block_nr;
