@@ -36,7 +36,7 @@ gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fsta
 /* 
   Debug:
 
-  gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fstack-protector-all -fsanitize=address -Og -g --std=c11
+  gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fstack-protector-all -Og -g --std=c11 -fsanitize=address
 
   -fsanitize=address
   Enable AddressSanitizer, a fast memory error detector. Memory access instructions are instrumented to detect out-of-bounds and use-after-free bugs.

@@ -49,7 +49,7 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
 
     // Bind socket to interface.
     // This is mandatory (with zero copy) to know the header size of frames
-    // used in the circular buffer.
+    // used in the circular buffer:
     memset(&thd_opt->bind_addr, 0, sizeof(thd_opt->bind_addr));
     thd_opt->bind_addr.sll_family   = AF_PACKET;
     thd_opt->bind_addr.sll_protocol = htons(ETH_P_ALL);
@@ -62,49 +62,61 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
         return EXIT_FAILURE;
     }
 
-    ///// Force the SO_SNDBUF?
+
+    // Increase the socket Tx queue size so that the entire PACKET_MMAP Tx ring
+    // can fit into the socket Tx queue. The Kerne will double the value provided
+    // to allow for sk_buff overhead:
     if (thd_opt->sk_mode == SKT_TX) {
 
-        int32_t read_size;
-        socklen_t read_len = sizeof(read_size);
-        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &read_size, &read_len) < 0) {
-            perror("getsockopt: SO_SNDBUF");
+        int32_t sock_wmem_cur;
+        socklen_t read_len = sizeof(sock_wmem_cur);
+        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur, &read_len) < 0) {
+            perror("Can't get the socket write buffer size");
             return EXIT_FAILURE;
         }
 
-        int32_t send_size = thd_opt->block_sz * thd_opt->block_nr; // 4096 * 256 // Make this automatic? block_sz*block_nr
+        int32_t sock_wmem = (thd_opt->block_sz * thd_opt->block_nr);
 
-        if (read_size < send_size) {
+        if (sock_wmem_cur < sock_wmem) {
 
-            printf("Original send buff size = %d\n", read_size);
-            printf("Desired send buff size = %d\n", send_size);
+            /////// Add verbose if?
+            printf("Current socket write buffer size is %d bytes, desired write buffer size is %d bytes\n",
+                    sock_wmem_cur, sock_wmem);
 
+            printf("Trying to increase socket write buffer size to %d bytes...\n", sock_wmem);
 
-            if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &send_size, sizeof(send_size)) < 0) {
-                perror("setsockopt: SO_SNDBUF");
+            if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem, sizeof(sock_wmem)) < 0) {
+                perror("Can't set the socket write buffer size");
                 return EXIT_FAILURE;
             }
-            if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &read_size, &read_len) < 0) {
-                perror("getsockopt: SO_SNDBUF");
+            
+            if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur, &read_len) < 0) {
+                perror("Can't get the socket write buffer size");
                 return EXIT_FAILURE;
             }
-            printf("New send buff size = %d\n", read_size);
+
+            printf("Write buffer size set to %d bytes\n", sock_wmem_cur);
 
 
-            if (read_size != send_size) {
-                if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE, &send_size, sizeof(send_size))<0) {
-                    perror("setsockopt: SO_SNDBUFFORCE");
+            if (sock_wmem_cur != sock_wmem) {
+
+                printf("Trying to force the write buffer size to %d bytes...\n", sock_wmem);
+                
+                if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE, &sock_wmem, sizeof(sock_wmem))<0) {
+                    perror("Can't force the socket write buffer size");
                     return EXIT_FAILURE;
                 }
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &read_size, &read_len) < 0) {
-                    perror("getsockopt: SO_SNDBUF");
+                
+                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur, &read_len) < 0) {
+                    perror("Can't get the socket write buffer size");
                     return EXIT_FAILURE;
                   }
-                printf("Forced send buff size = %d\n", read_size);
-                if (read_size != send_size) {
-                    printf("still smaller than desired\n");
-                    //return EXIT_FAILURE;
+                
+                printf("Forced write buffer size is now %d bytes\n", sock_wmem_cur);
+                if (sock_wmem_cur != sock_wmem) {
+                    printf("Still smaller than desired!\n");
                 }
+
             }
 
         }
@@ -132,8 +144,9 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
 
 
     // Enable packet loss, only supported on Tx
+    ///// Add CLI arg to enabled and disable by default?
     if (thd_opt->sk_mode == SKT_TX) {
-        
+        /*
         static const int32_t sock_discard = 0;
         int32_t sock_loss_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_LOSS, (void *)&sock_discard, sizeof(sock_discard));
 
@@ -141,6 +154,7 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
             perror("Can't enable PACKET_LOSS on socket");
             return EXIT_FAILURE;
         }
+        */
     }
 
 
@@ -161,9 +175,7 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
         perror("Can't set socket packet version");
         return EXIT_FAILURE;
     }
-
-
-
+    
 
     // Ensure software timestamping is disabled
     static const int32_t sock_timestamp = 0;
@@ -213,7 +225,7 @@ int32_t setup_socket_mmap(struct thd_opt *thd_opt) {
     if (thd_opt->sk_mode == SKT_TX) {
 
         thd_opt->tpacket_req.tp_block_size = thd_opt->block_sz;
-        thd_opt->tpacket_req.tp_frame_size = thd_opt->block_frm_sz;
+        thd_opt->tpacket_req.tp_frame_size = thd_opt->block_frm_sz; // tp_frame_size = TPACKET2_HDRLEN + frame_sz
         thd_opt->tpacket_req.tp_block_nr   = thd_opt->block_nr;
         thd_opt->tpacket_req.tp_frame_nr   = thd_opt->frame_nr;
 
@@ -388,14 +400,16 @@ void *packet_tx_mmap(void* thd_opt_p) {
     while(1) {
 
 
-        for (i = 0; i < thd_opt->tpacket_req.tp_frame_nr; i += 1) {
-
-            hdr = (void*)(thd_opt->mmap_buf + (thd_opt->tpacket_req.tp_frame_size * i));
-            data = (uint8_t*)(hdr + TPACKET_ALIGN(TPACKET2_HDRLEN));
+        for (i = 0; i < thd_opt->frame_nr; i += 1) {
+            hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
+            // TPACKET2_HDRLEN == (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))
+            // For raw Ethernet frames where the layer 2 headers are present
+            // and the ring blocks are already aligned its fine to use:
+            // sizeof(struct tpacket2_hdr)
+            data = (uint8_t*)hdr + sizeof(struct tpacket2_hdr);
             memcpy(data, thd_opt->tx_buffer, thd_opt->frame_sz);
             hdr->tp_len = thd_opt->frame_sz;
             hdr->tp_status = TP_STATUS_SEND_REQUEST;
-
         }
         
         /*
@@ -411,7 +425,7 @@ void *packet_tx_mmap(void* thd_opt_p) {
         tx_bytes = sendto(thd_opt->sock_fd, NULL, 0, MSG_DONTWAIT, NULL, 0);
 
         if (tx_bytes == -1) {
-            perror("sendto error");
+            perror("sendto() error");
             exit(EXIT_FAILURE);
         }
         
@@ -627,51 +641,51 @@ int main(int argc, char *argv[]) {
         printf("Running in Tx mode\n");
     }
 
-    printf("Frame size set to %d\n", etherate.frm_opt.frame_sz);
+    printf("Frame size set to %d bytes\n", etherate.frm_opt.frame_sz);
 
     ////// Move this to seperate function?
     if (etherate.app_opt.mode == SKT_TX) {
 
-        etherate.frm_opt.block_frm_sz = etherate.frm_opt.frame_sz + TPACKET2_HDRLEN;
+        // The frame allocation in the ring block holds the full layer 2 frame 
+        // (headers + data) and some meta data, so it must hold TPACKET2_HDRLEN
+        // (which is 52 bytes) aligned with TPACKET_ALIGN() (which increases it
+        // from 52 to 64 bytes) + the minimum Ethernet layer 2 frame size (which
+        // is 64 bytes):
+        etherate.frm_opt.block_frm_sz = (etherate.frm_opt.frame_sz + TPACKET_ALIGN(TPACKET2_HDRLEN));
 
-        // The frame in the ring block must also contain a header (seperate to the frame header)
-        if (etherate.frm_opt.block_frm_sz < TPACKET2_HDRLEN) {
-            printf("Block frame size (%d) is less than TPACKET2_HDRLEN (%lu)!\n", etherate.frm_opt.block_frm_sz, TPACKET2_HDRLEN);
-            exit(EXIT_FAILURE);
-        }
-
-        // Blocks must be an integer multiple of pages
-        if (etherate.frm_opt.block_sz < getpagesize()) {
-            printf("Block size (%d) is less than page size (%d)! ", etherate.frm_opt.block_sz, getpagesize());
-            etherate.frm_opt.block_sz = getpagesize();
-            printf("Padded to %d.\n", getpagesize());
-        }
-
-        // The block frame size must be a multiple of TPACKET_ALIGNMENT (16) AND a multiple of the block size,
-        // and blocks must be an integer number of pages:
-        uint16_t tpacket_block_align = getpagesize() / TPACKET_ALIGNMENT;
-
-        if (etherate.frm_opt.block_frm_sz % tpacket_block_align != 0) {
-            printf("Block frame size (%d) is not a multiple of TPACKET_ALIGN (%d) and the block size (%d)! ", etherate.frm_opt.block_frm_sz, tpacket_block_align, etherate.frm_opt.block_sz);
-            uint32_t base = (etherate.frm_opt.block_frm_sz / tpacket_block_align) + 1;
-            etherate.frm_opt.block_frm_sz = (base * tpacket_block_align);
-            printf("Padded to %d.\n", etherate.frm_opt.block_frm_sz);
-        }
-
-        // Blocks must contain at least 1 frame, frames can not be fragmented across blocks
+        // Blocks must contain at least 1 frame because frames can not be fragmented across blocks
         if (etherate.frm_opt.block_sz < etherate.frm_opt.block_frm_sz) {
-            printf("Block size (%d) is less than block frame size (%d)! ", etherate.frm_opt.block_sz, etherate.frm_opt.block_frm_sz);
-            etherate.frm_opt.block_sz = etherate.frm_opt.block_frm_sz;
-
-            // Check again in case it is no longer page aligned
-            if (etherate.frm_opt.block_sz % getpagesize() != 0) {
-                uint32_t base = (etherate.frm_opt.block_sz / getpagesize()) + 1;
-                etherate.frm_opt.block_sz = (base * getpagesize());
+            
+            if (etherate.app_opt.verbose) {
+                printf("Block size (%d) is less than block frame size (%d), padding to %d!\n.",
+                       etherate.frm_opt.block_sz,
+                       etherate.frm_opt.block_frm_sz,
+                       etherate.frm_opt.block_frm_sz);
             }
-            printf("Padded to %d.\n", etherate.frm_opt.block_sz);
+            
+            etherate.frm_opt.block_sz = etherate.frm_opt.block_frm_sz;
         }
 
-        // The following integer math occurs in af_packet.c, the remainder is lost so the number
+        // Block size must be an integer multiple of pages
+        if (
+            (etherate.frm_opt.block_sz < getpagesize()) ||
+            (etherate.frm_opt.block_sz % getpagesize() != 0)) {
+
+            uint32_t base = (etherate.frm_opt.block_sz / getpagesize()) + 1;
+            
+            if (etherate.app_opt.verbose) {
+                printf("Block size (%d) is not a multiple of the page size (%d), padding to %d!\n",
+                        etherate.frm_opt.block_sz,
+                        getpagesize(),
+                        (base * getpagesize()));
+            }
+            
+            etherate.frm_opt.block_sz = (base * getpagesize());
+        }
+
+
+        // The block frame size must be a multiple of TPACKET_ALIGNMENT (16) also,
+        // the following integer math occurs in af_packet.c, the remainder is lost so the number
         // of frames per block MUST be either 1 or a power of 2:
         // packet_set_ring(): rb->block_frm_nr = req->tp_block_size / req->tp_frame_size;
         // packet_set_ring(): Checks if (block_frm_nr == 0) return EINVAL;
@@ -681,7 +695,11 @@ int main(int argc, char *argv[]) {
         uint32_t is_power_of_two = (block_frm_nr != 0) && ((block_frm_nr & (block_frm_nr - 1)) == 0 );
 
         if ((block_frm_nr != 1) && (is_power_of_two != 1)) {
-            printf("Frames per block: %u. Frames per block must be 1 or a power of 2! ", block_frm_nr);
+
+            if (etherate.app_opt.verbose) {
+                printf("Frames per block (%u) must be 1 or a power of 2!\n", block_frm_nr);
+            }
+
             next_power = block_frm_nr;
             next_power--;
             next_power |= next_power >> 1;
@@ -701,20 +719,40 @@ int main(int argc, char *argv[]) {
             etherate.frm_opt.block_frm_sz = etherate.frm_opt.block_sz / next_power;
             block_frm_nr = etherate.frm_opt.block_sz / etherate.frm_opt.block_frm_sz;
 
-            printf("Frames per block increased to (%d) and block size increased to %u.\n", block_frm_nr, etherate.frm_opt.block_sz);
-            printf("Block frame size increased to %u to evenly fill block.\n", etherate.frm_opt.block_frm_sz);
+            if (etherate.app_opt.verbose) {
+                printf("Frames per block increased to %d and block size increased to %u.\n",
+                        block_frm_nr, etherate.frm_opt.block_sz);
 
+                printf("Block frame size increased to %u to evenly fill block.\n",
+                        etherate.frm_opt.block_frm_sz);
+            }
+
+        // If the number of frames per block is already 1 or a power of 2, the frame block size must fill the block exactly,
+        // use integer math to round off the frame block size to an exact multiple of the block size:
+        } else if (
+            (etherate.frm_opt.block_sz / etherate.frm_opt.block_frm_sz != 1) ||
+            (etherate.frm_opt.block_sz % etherate.frm_opt.block_frm_sz != 0)) {
+
+             uint32_t base = etherate.frm_opt.block_sz / etherate.frm_opt.block_frm_sz;
+             etherate.frm_opt.block_frm_sz = etherate.frm_opt.block_sz / base;
+
+             if (etherate.app_opt.verbose) {
+                 printf("Block frame size increased to %u to evenly fill block.\n",
+                        etherate.frm_opt.block_frm_sz);
+             }
         }
 
-        if (etherate.frm_opt.block_frm_sz % tpacket_block_align != 0) {
-            printf("Block frame size (%d) is not a multiple of tpacket_block_align (%d)! ", etherate.frm_opt.block_frm_sz, tpacket_block_align);
-            uint32_t base = (etherate.frm_opt.block_frm_sz / tpacket_block_align) + 1;
-            etherate.frm_opt.block_frm_sz = (base * tpacket_block_align);
-            printf("Padded to %d.\n", etherate.frm_opt.block_frm_sz);
-        }
 
+        block_frm_nr = etherate.frm_opt.block_sz / etherate.frm_opt.block_frm_sz;
         etherate.frm_opt.frame_nr = (etherate.frm_opt.block_sz * etherate.frm_opt.block_nr) / etherate.frm_opt.block_frm_sz;
-        printf("Frames per block %d, block number %d, frames in ring %d\n", block_frm_nr, etherate.frm_opt.block_nr, etherate.frm_opt.frame_nr);
+        if (etherate.app_opt.verbose) {
+            printf("Frame block size %d, frames per block %d, block number %d, block size %d, frames in ring %d\n",
+                   etherate.frm_opt.block_frm_sz,
+                   block_frm_nr,
+                   etherate.frm_opt.block_nr,
+                   etherate.frm_opt.block_sz,
+                   etherate.frm_opt.frame_nr);
+        }
 
         if ((block_frm_nr * etherate.frm_opt.block_nr) != etherate.frm_opt.frame_nr) {
             printf("Frames per block (%d) * block number (%d) != frame number in ring (%d)!\n", block_frm_nr, etherate.frm_opt.block_nr, etherate.frm_opt.frame_nr);
