@@ -1,6 +1,14 @@
+-----EtherateMT 0.3 Alpha 2017-06
+
+[MINOR] Fixed bug in stats fps/Gbps
+
+[MINOR] Cody tidy, seperate code into additional files
+
+
+
 -----EtherateMT 0.2 Alpha 2017-05
 
-[MAJOR] Fixed frame / block / page / ring alignment, Tx was packing one frame per block, now multi-frames per blocks are now supported.
+[MAJOR] Fixed frame / block / page / ring alignment, Tx was packing one frame per block, now multi-frames per blocks are supported.
 
 [MINOR] Fixed socket sndbuf resize code
 
@@ -12,6 +20,6 @@
 
 
 Changelog tags;
-[FEATURE]  == New working feature added to Etherate
-[MAJOR]    == Fixed a bug in Etherate code that affects the operations of the program or one of the test modes or test results
-[MINOR]    == Fixed a bug that doesn't stop Etherate from running properly like typos, formatting, documentation errata, code tidies
+[FEATURE]  == New working feature added to EtherateMT
+[MAJOR]    == Fixed a bug in EtherateMT code that affects the operations of the program or one of the test modes or test results
+[MINOR]    == Fixed a bug that doesn't stop EtherateMT from running properly like typos, formatting, documentation errata, code tidies
