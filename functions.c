@@ -1,3 +1,32 @@
+/*
+ * License: MIT
+ *
+ * Copyright (c) 2016-2017 James Bensley.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+
+
+#include "functions.h"
+
 
 
 uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
@@ -50,7 +79,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             } else if (strncmp(argv[i], "-c", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->app_opt.num_threads = (uint32_t)strtoul(argv[i+1], NULL, 0);
+                    etherate->app_opt.thd_cnt = (uint32_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing number of threads.\n"
@@ -60,19 +89,19 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
 
             // Load a custom frame from file for Tx
-            } else if (strncmp(argv[i], "-C", 2)==0) {
+            } else if (strncmp(argv[i], "-C", 2) == 0) {
                 if (argc > (i+1))
                 {
                     FILE* frame_file = fopen(argv[i+1], "r");
                     if (frame_file == NULL){
-                        perror("Opps! File loading error!");
+                        perror("Opps! File opening error!");
                         return EXIT_FAILURE;
                     }
 
                     int16_t file_ret = 0;
                     etherate->frm_opt.frame_sz = 0;
                     while (file_ret != EOF &&
-                          (etherate->frm_opt.frame_sz < frame_sz_max)) {
+                          (etherate->frm_opt.frame_sz < DEF_FRM_SZ_MAX)) {
 
                         file_ret = fscanf(frame_file, "%hhx", etherate->frm_opt.tx_buffer + etherate->frm_opt.frame_sz);
 
@@ -82,6 +111,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                     }
 
                     fclose(frame_file);
+                    ///// Need to check fclose ret val?
 
                     printf("Using custom frame (%d octets loaded):\n", etherate->frm_opt.frame_sz);
 
@@ -111,15 +141,15 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
 
             // Specifying frame payload size in bytes
-            } else if (strncmp(argv[i], "-f", 2)==0) {
+            } else if (strncmp(argv[i], "-f", 2) == 0) {
 
                 if (argc > (i+1)) {
 
                     etherate->frm_opt.frame_sz = (uint32_t)strtoul(argv[i+1], NULL, 0);
 
-                    if (etherate->frm_opt.frame_sz > frame_sz_max) {
+                    if (etherate->frm_opt.frame_sz > DEF_FRM_SZ_MAX) {
                         printf("The frame size is larger than the Etherate buffer size"
-                               " (%d bytes)!\n", frame_sz_max);
+                               " (%d bytes)!\n", DEF_FRM_SZ_MAX);
                         return EX_SOFTWARE;
                     }
 
@@ -142,20 +172,20 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
 
             // Display usage information
-            } else if (strncmp(argv[i], "-h", 2)==0 ||
-                       strncmp(argv[i], "--help", 6)==0) {
+            } else if (strncmp(argv[i], "-h", 2) == 0 ||
+                       strncmp(argv[i], "--help", 6) == 0) {
 
                 print_usage();
                 exit(EX_SOFTWARE);
 
 
             // Set interface by name
-            } else if (strncmp(argv[i], "-i", 2)==0) {
+            } else if (strncmp(argv[i], "-i", 2) == 0) {
                 ///// If the interface name is wrong we quit with no error
 
                 if (argc > (i+1)) {
 
-                    strncpy((char*)etherate->sk_opt.if_name, argv[i+1], IFNAMSIZ);
+                    strncpy((char*)etherate->sk_opt.if_name, argv[i+1], IF_NAMESIZE);
                     etherate->sk_opt.if_index = get_if_index_by_name(etherate->sk_opt.if_name);
                     
                     if (etherate->sk_opt.if_index == -1) {
@@ -173,14 +203,14 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
 
             // Set interface by index number
-            } else if (strncmp(argv[i], "-I", 2)==0) {
+            } else if (strncmp(argv[i], "-I", 2) == 0) {
 
                 if (argc > (i+1)) {
 
                     etherate->sk_opt.if_index = (uint32_t)strtoul(argv[i+1], NULL, 0);
                     get_if_name_by_index(etherate->sk_opt.if_index, etherate->sk_opt.if_name);
 
-                    if (etherate->sk_opt.if_name[0]==0) {
+                    if (etherate->sk_opt.if_name[0] == 0) {
                         return(EXIT_FAILURE);
                     }
                     
@@ -195,24 +225,33 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
 
             // List interfaces
-            } else if (strncmp(argv[i], "-l", 2)==0) {
-
+            } else if (strncmp(argv[i], "-l", 2) == 0) {
                 get_if_list();
                 return(EX_SOFTWARE);
 
 
+            // Change to a normal packet socket (no ring buffer)
+            } else if (strncmp(argv[i], "-p", 2) == 0) {
+                etherate->app_opt.sk_type = SKT_PACKET;
+
+
             // Change to receive mode
-            }else if (strncmp(argv[i], "-r" ,2)==0)  {
-                etherate->app_opt.mode = 0; ///// Use global SK_TX?
+            } else if (strncmp(argv[i], "-r" ,2) == 0)  {
+                etherate->app_opt.sk_mode = SKT_RX;
+
+
+            } else if (strncmp(argv[i], "-rt", 3) == 0) {
+                etherate->app_opt.sk_mode = SKT_BIDI;
+
 
             // Enable verbose output
-            }else if (strncmp(argv[i], "-v" ,2)==0)  {
-                etherate->app_opt.verbose = 1; ///// Use global SK_TX?
+            } else if (strncmp(argv[i], "-v" ,2) == 0)  {
+                etherate->app_opt.verbose = 1;
 
 
             // Display version
-            } else if (strncmp(argv[i], "-V", 2)==0 ||
-                       strncmp(argv[i], "--version", 9)==0) {
+            } else if (strncmp(argv[i], "-V", 2) == 0 ||
+                       strncmp(argv[i], "--version", 9) == 0) {
 
                 printf("Etherate version %s\n", app_version);
                 exit(EX_SOFTWARE);
@@ -234,56 +273,63 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 }
 
 
+
 void etherate_setup(struct etherate *etherate) {
 
-    etherate->app_opt.mode            = 1;
-    etherate->app_opt.num_threads     = 1;
-    etherate->app_opt.thread_sk_affin = 0;
-    etherate->app_opt.fanout_group_id = getpid() & 0xffff; // All fanout worker threads will 
-                                                           // belong to the same fanout group
-    etherate->app_opt.verbose         = 0;
+    // All fanout worker threads will belong to the same fanout group
+    etherate->app_opt.fanout_grp     = getpid() & 0xffff;
+    etherate->app_opt.sk_mode        = SKT_TX;
+    etherate->app_opt.sk_type        = SKT_PACKET_MMAP;
+    etherate->app_opt.thd_cnt        = 1;
+    etherate->app_opt.thd_sk_affin   = 0;
+    etherate->app_opt.verbose        = 0;
     
-    etherate->frm_opt.block_frm_sz   = def_block_frm_sz;
-    etherate->frm_opt.block_nr       = def_block_nr;
-    etherate->frm_opt.block_sz       = def_block_sz;
+    etherate->frm_opt.block_frm_sz   = DEF_BLK_FRM_SZ;
+    etherate->frm_opt.block_nr       = DEF_BLK_NR;
+    etherate->frm_opt.block_sz       = DEF_BLK_SZ;
     etherate->frm_opt.custom_frame   = 0;
     etherate->frm_opt.frame_nr       = 0;
-    etherate->frm_opt.frame_sz       = def_frame_sz;
-    etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(frame_sz_max,1); // Used to load a custom frame payload
+    etherate->frm_opt.frame_sz       = DEF_FRM_SZ;
+    // Used to load a custom frame payload
+    etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
     
     etherate->sk_opt.if_index        = 0;
-    memset(&etherate->sk_opt.if_name, 0, sizeof(IFNAMSIZ));
+    memset(&etherate->sk_opt.if_name, 0, IF_NAMESIZE);
 
-
-    return;
 }
 
 
-// Return interface index from name
-int32_t get_if_index_by_name(uint8_t if_name[IFNAMSIZ]) {
 
-    const int32_t retval = -1;
+int32_t get_if_index_by_name(uint8_t if_name[IF_NAMESIZE]) {
+
+    #define ret -1;
 
     int32_t sock_fd;
     struct ifreq ifr;
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, (char*)if_name, IFNAMSIZ);
+    strncpy(ifr.ifr_name, (char*)if_name, IF_NAMESIZE);
     sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
     if (ioctl(sock_fd, SIOCGIFINDEX, &ifr)==0)
     {
-        close(sock_fd);
+        if (close(sock_fd) == -1) {
+            perror("Couldn't close socket");
+            exit(EX_PROTOCOL);
+        }
         return ifr.ifr_ifindex;
     }
 
-    close(sock_fd);
-    return retval;
+    if (close(sock_fd) == -1) {
+        perror("Couldn't close socket");
+        exit(EX_PROTOCOL);
+    }
+    return ret;
 
 }
 
 
-// List available AF_PACKET interfaces and their index
+
 void get_if_list() {
 
     struct ifreq ifreq;
@@ -292,8 +338,8 @@ void get_if_list() {
     int sock_fd;
     sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-    if (getifaddrs(&ifaddr)==-1) {
-        perror("Couldn't getifaddrs() to list interfaces");
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("Couldn't get interface list");
         exit(EX_PROTOCOL);
     }
 
@@ -312,13 +358,21 @@ void get_if_list() {
             strncpy(ifreq.ifr_name,ifa->ifa_name,sizeof(ifreq.ifr_name));
 
             // Does this device have a hardware address?
-            if (ioctl (sock_fd, SIOCGIFHWADDR, &ifreq)==0) {
+            if (ioctl (sock_fd, SIOCGIFHWADDR, &ifreq) == 0) {
 
                 uint8_t mac[6];
                 memcpy(mac, ifreq.ifr_addr.sa_data, 6);
 
                 // Get the interface index
-                ioctl(sock_fd, SIOCGIFINDEX, &ifreq);
+                if (ioctl(sock_fd, SIOCGIFINDEX, &ifreq) == -1) {
+
+                    perror("Couldn't get the interface index");
+                    if (close(sock_fd) == -1) {
+                        perror("Couldn't close socket");
+                    }
+                    exit(EX_PROTOCOL);
+
+                }
 
                 // Print the current_cpu_setnt interface details
                 printf("Device %s with address %02x:%02x:%02x:%02x:%02x:%02x, "
@@ -326,7 +380,7 @@ void get_if_list() {
                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
                        ifreq.ifr_ifindex);
 
-            }
+            } 
 
         }
 
@@ -340,7 +394,7 @@ void get_if_list() {
 }
 
 
-// Return interface name from index
+
 void get_if_name_by_index(int32_t if_index, uint8_t* if_name) {
 
     int32_t sock_fd;
@@ -352,26 +406,34 @@ void get_if_name_by_index(int32_t if_index, uint8_t* if_name) {
 
     if (ioctl(sock_fd, SIOCGIFNAME, &ifr)==0)
     {
-        strncpy((char*)if_name, ifr.ifr_name, IFNAMSIZ);
-        close(sock_fd);
+        strncpy((char*)if_name, ifr.ifr_name, IF_NAMESIZE);
+        if (close(sock_fd) == -1) {
+            perror("Couldn't close socket");
+        }
         return;
     } else {
-        memset(if_name, 0, IFNAMSIZ);
-        close(sock_fd);
+        memset(if_name, 0, IF_NAMESIZE);
+        if (close(sock_fd) == -1) {
+            perror("Couldn't close socket");
+        }
         return;
     }
 
 }
 
 
-// Accumulate and print traffic stats
+
 void *print_pps(void *etherate_p) {
 
     struct etherate *etherate  = etherate_p;
+    struct tpacket_stats_v3      tpacket_stats;
     uint64_t duration          = 0;
     uint64_t rx_bytes_previous = 0;
+    uint64_t rx_drops          = 0;
     uint64_t rx_pkts_previous  = 0;
+    uint64_t rx_q_frz          = 0;
     uint64_t tx_bytes_previous = 0;
+    uint64_t tx_drops          = 0;
     uint64_t tx_pkts_previous  = 0;
     uint64_t rx_bytes_now      = 0;
     uint64_t rx_pkts_now       = 0;
@@ -384,37 +446,65 @@ void *print_pps(void *etherate_p) {
     double tx_gbps             = 0;
     double rx_gbps             = 0;
 
+
+    // Wait for one of the Tx/Rx threads to start
+    /////
+    /*
+    while (1) {
+        for(uint16_t thread = 0; thread < etherate->app_opt.thd_cnt; thread++) {
+            if (etherate->thd_opt[thread].started == 1) break;
+        }
+    }
+    */
+
+
     while(1) {
 
-            rx_bytes_previous = 0;
-            rx_pkts_previous  = 0;
-            tx_bytes_previous = 0;
-            tx_pkts_previous  = 0;
-            rx_bytes_now      = 0;
-            rx_pkts_now       = 0;
-            tx_bytes_now      = 0;
-            tx_pkts_now       = 0;            
+        rx_bytes_now      = 0;
+        rx_drops          = 0;
+        rx_pkts_now       = 0;
+        rx_q_frz          = 0;
+        tx_bytes_now      = 0;
+        tx_drops          = 0;
+        tx_pkts_now       = 0;
 
-        for(uint16_t thread = 0; thread < etherate->app_opt.num_threads; thread++) {
-
-            rx_bytes_previous += etherate->thd_opt[thread].rx_bytes;
-            rx_pkts_previous  += etherate->thd_opt[thread].rx_pkts;
-            tx_bytes_previous += etherate->thd_opt[thread].tx_bytes;
-            tx_pkts_previous  += etherate->thd_opt[thread].tx_pkts;
-        }
-
-        sleep(1);
-
-        duration += 1;
-        
-        for(uint16_t thread = 0; thread < etherate->app_opt.num_threads; thread++) {
+        for(uint16_t thread = 0; thread < etherate->app_opt.thd_cnt; thread++) {
 
             rx_bytes_now += etherate->thd_opt[thread].rx_bytes;
             rx_pkts_now  += etherate->thd_opt[thread].rx_pkts;
             tx_bytes_now += etherate->thd_opt[thread].tx_bytes;
             tx_pkts_now  += etherate->thd_opt[thread].tx_pkts;
 
+            if(etherate->thd_opt[thread].sk_mode == SKT_TX) {
+                
+                // Not supported on TPACKET v3?
+                /*
+                socklen_t stats_len = sizeof(tpacket_stats);
+                int32_t sock_stats = getsockopt(etherate->thd_opt[thread].sock_fd, SOL_PACKET, PACKET_STATISTICS, &sock_stats, &stats_len);
+                if (sock_stats < 0) {
+                    perror("Couldn't get Tx TPACKET socket stats");
+                    exit(EXIT_FAILURE);
+                }
+
+                tx_drops += tpacket_stats.tp_drops;
+                */
+
+            } else if(etherate->thd_opt[thread].sk_mode == SKT_RX) {
+
+                socklen_t stats_len = sizeof(tpacket_stats);
+                int32_t sock_stats = getsockopt(etherate->thd_opt[thread].sock_fd, SOL_PACKET, PACKET_STATISTICS, &sock_stats, &stats_len);
+                if (sock_stats < 0) {
+                    perror("Couldn't get Rx TPACKET socket stats");
+                    exit(EXIT_FAILURE);
+                }
+
+                rx_drops += tpacket_stats.tp_drops;
+                rx_q_frz += tpacket_stats.tp_freeze_q_cnt;
+
+            }
+
         }
+
 
         rx_bytes = rx_bytes_now - rx_bytes_previous;
         rx_pps   = rx_pkts_now  - rx_pkts_previous;
@@ -424,12 +514,30 @@ void *print_pps(void *etherate_p) {
         rx_gbps = ((double)(rx_bytes*8)/1000/1000/1000);
         tx_gbps = ((double)(tx_bytes*8)/1000/1000/1000);
 
-        printf("%" PRIu64 ".\t%.2f Rx Gbps (%" PRIu64 " fps)\t%.2f Tx Gbps (%" PRIu64 " fps)\n", duration, rx_gbps, rx_pps, tx_gbps, tx_pps);
+        if(etherate->app_opt.verbose) {
+            printf("%" PRIu64 ".\t%.2f Rx Gbps (%" PRIu64 " fps) %lu Drops %lu Q-Freeze\t%.2f Tx Gbps (%" PRIu64 " fps) %lu Drops\n",
+                   duration, rx_gbps, rx_pps, rx_drops, rx_q_frz, tx_gbps, tx_pps, tx_drops);
+        } else {
+            printf("%" PRIu64 ".\t%.2f Rx Gbps (%" PRIu64 " fps)\t%.2f Tx Gbps (%" PRIu64 " fps)\n", duration, rx_gbps, rx_pps, tx_gbps, tx_pps);
+        }
+
+        for(uint16_t thread = 0; thread < etherate->app_opt.thd_cnt; thread++) {
+
+            rx_bytes_previous = rx_bytes_now;
+            rx_pkts_previous  = rx_pkts_now;
+            tx_bytes_previous = tx_bytes_now;
+            tx_pkts_previous  = tx_pkts_now;
+        }
+
+        duration += 1;
+
+        sleep(1);
 
         ///// On thread quit print min/max/avg in Gbps and pps, also total GBs/TBs transfered?
 
     }
 }
+
 
 
 void print_usage () {
@@ -450,11 +558,12 @@ void print_usage () {
             "\t-i\tSet interface by name.\n"
             "\t-I\tSet interface by index.\n"
             "\t-l\tList available interfaces.\n"
+            "\t-p\tSwitch to packet socket, the default is PACKET_MMAP.\n"
             "\t-r\tSwitch to Rx mode, the default is Tx.\n"
+            "\t-rt\tSwith to bidirectional mode.\n"
             "\t-V|--version Display version\n"
             "\t-h|--help Display this help text\n",
-            def_block_frm_sz, def_block_sz, def_block_nr,
-            def_frame_sz, frame_sz_max);
+            DEF_BLK_FRM_SZ, DEF_BLK_SZ, DEF_BLK_NR,
+            DEF_FRM_SZ, DEF_FRM_SZ_MAX);
 
 }
-
