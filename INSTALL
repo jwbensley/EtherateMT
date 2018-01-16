@@ -1,4 +1,4 @@
-gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fstack-protector-all -O3 --std=c11
+gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11
 
 /*
   Compile:
@@ -20,9 +20,6 @@ gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fsta
   -ftrapv
   This option generates traps for signed overflow on addition, subtraction, multiplication operations.
 
-  -fstack-protector-all
-  Like -fstack-protector except that all functions are protected
-
   -O3
   With -O, the compiler tries to reduce code size and execution time, without performing any optimizations that take a great deal of compilation time.
   -O1 Optimize.  Optimizing compilation takes somewhat more time, and a lot more memory for a large function.
@@ -37,6 +34,9 @@ gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fsta
   Debug:
 
   gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fstack-protector-all -Og -g --std=c11 -fsanitize=address
+
+  -fstack-protector-all
+  Like -fstack-protector except that all functions are protected
 
   -fsanitize=address
   Enable AddressSanitizer, a fast memory error detector. Memory access instructions are instrumented to detect out-of-bounds and use-after-free bugs.
@@ -84,9 +84,9 @@ gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fsta
 
   sudo valgrind --tool=callgrind ./etherate_mt -I 3 -r
 
-callgrind_annotate ./callgrind.out.2974 /path/to/tests.cpp
-or
-callgrind_annotate --auto=yes ./callgrind.out.2974
+  callgrind_annotate ./callgrind.out.2974 /path/to/tests.cpp
+  # or
+  callgrind_annotate --auto=yes ./callgrind.out.2974
 
 */
 
@@ -98,9 +98,9 @@ callgrind_annotate --auto=yes ./callgrind.out.2974
   --branch-sim=yes
   Enables collection of branch instruction and misprediction counts.
 
-cg_annotate ./cachegrind-out /path/to/tests.cpp
-or
-sudo kcachegrind cachegrind.out
+  cg_annotate ./cachegrind-out /path/to/tests.cpp
+  # or
+  sudo kcachegrind cachegrind.out
 
  */
 

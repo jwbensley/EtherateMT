@@ -25,11 +25,14 @@
 
 
 
-// Rx thread loop using read()
-void *rx_packet(void* thd_opt_p);
+// PACKET_MMAP Rx thread loop
+void *rx_tpacket_v3(void* thd_opt_p);
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t packet_setup_socket(struct thd_opt *thd_opt);
+// PACKET_MMAP ring/block alignment
+void tpacket_v3_ring(struct etherate *etherate);
 
-// Tx thread loop using sendto()
-void *tx_packet(void* thd_opt_p);
+// Return PACKET_MMAP socket FD
+int32_t tpacket_v3_sock(struct thd_opt *thd_opt);
+
+// PACKET_MMAP Tx thread loop
+void *tx_tpacket_v3(void* thd_opt_p);

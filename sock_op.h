@@ -25,11 +25,24 @@
 
 
 
-// Rx thread loop using read()
-void *rx_packet(void* thd_opt_p);
+#define S_O_PROMISC_ADD 1
+#define S_O_PROMISC_REM 2
+#define S_O_BIND        3
+#define S_O_QLEN_TP23   4
+#define S_O_LOSSY       5
+#define S_O_VER_TP2     6
+#define S_O_VER_TP3     7
+#define S_O_NIC_TS      8
+#define S_O_TS          9
+#define S_O_QDISC       10
+#define S_O_RING_TP2    11
+#define S_O_RING_TP3    12
+#define S_O_MMAP_TP23   13
+#define S_O_FANOUT      14
+#define S_O_QLEN_MSG    15
+#define S_O_QLEN_MMSG    16
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t packet_setup_socket(struct thd_opt *thd_opt);
 
-// Tx thread loop using sendto()
-void *tx_packet(void* thd_opt_p);
+
+// Configure a socket option "op" against thd_opt->sock_fd
+int32_t sock_op(uint8_t op, struct thd_opt *thd_opt);

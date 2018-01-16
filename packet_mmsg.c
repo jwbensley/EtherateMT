@@ -25,33 +25,52 @@
 
 
 
-#include "packet.h"
+#include "packet_mmsg.h" ///// Rename this
 
 
 
-void *rx_packet(void* thd_opt_p) {
+void *rx_recvmmsg(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
-    int32_t sk_setup_ret = packet_setup_socket(thd_opt_p);
+    int32_t sk_setup_ret = msg_setup_socket(thd_opt_p);
     if (sk_setup_ret != EXIT_SUCCESS) {
         exit(EXIT_FAILURE);
     }
 
-    int32_t rx_bytes;
+
+    int32_t rx_frames = 0;
     /////thd_opt->started = 1;
+
+    struct mmsghdr mmsg_hdr[thd_opt->msgvec_vlen];
+    struct iovec iov[thd_opt->msgvec_vlen];
+    memset(mmsg_hdr, 0, sizeof(mmsg_hdr));
+    memset(iov, 0, sizeof(iov));
+
+    for (int i = 0; i < thd_opt->msgvec_vlen; i += 1) {
+        iov[i].iov_base = thd_opt->rx_buffer;
+        iov[i].iov_len = thd_opt->frame_sz;
+        mmsg_hdr[i].msg_hdr.msg_iov = &iov[i];
+        mmsg_hdr[i].msg_hdr.msg_iovlen = 1;
+        mmsg_hdr[i].msg_hdr.msg_name = NULL;
+        mmsg_hdr[i].msg_hdr.msg_control = NULL;
+        mmsg_hdr[i].msg_hdr.msg_controllen = 0;
+    }
 
     while(1) {
 
-        rx_bytes = read(thd_opt->sock_fd, thd_opt->rx_buffer, DEF_FRM_SZ_MAX); ///// Use recv() with flags?
+        rx_frames = recvmmsg(thd_opt->sock_fd, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL);
         
-        if (rx_bytes == -1) {
+        if (rx_frames == -1) {
             perror("Socket Rx error");
             exit(EXIT_FAILURE);
         }
 
-        thd_opt->rx_bytes += rx_bytes;
-        thd_opt->rx_pkts += 1;
+        for (int i = 0; i < rx_frames; i++) {
+            thd_opt->rx_bytes += mmsg_hdr[i].msg_len;
+        }
+        
+        thd_opt->rx_pkts += rx_frames;
 
     }
 
@@ -59,7 +78,7 @@ void *rx_packet(void* thd_opt_p) {
 
 
 
-int32_t packet_setup_socket(struct thd_opt *thd_opt) {
+int32_t mmsg_setup_socket(struct thd_opt *thd_opt) {
 
     // Create a raw socket
     thd_opt->sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -84,6 +103,16 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
 
     if (sock_bind == -1) {
         perror("Can't bind to AF_PACKET socket");
+        return EXIT_FAILURE;
+    }
+
+
+    // Increase the socket Tx queue size so that the entire msg vector can fit
+    // into the socket Tx/Rx queue. The Kernel will double the value provided
+    // to allow for sk_buff overhead:
+    int32_t sock_qlen = sock_op(S_O_QLEN_MMSG, thd_opt);
+
+    if (sock_qlen == -1) {
         return EXIT_FAILURE;
     }
 
@@ -153,43 +182,47 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
 
 
     return EXIT_SUCCESS;
+
 }
 
 
 
-void *tx_packet(void* thd_opt_p) {
+void *tx_sendmmsg(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
-    int32_t sk_setup_ret = packet_setup_socket(thd_opt_p);
+    int32_t sk_setup_ret = msg_setup_socket(thd_opt_p);
     if (sk_setup_ret != EXIT_SUCCESS) {
         exit(EXIT_FAILURE);
     }
 
-    int32_t tx_bytes;
-    /////thd_opt->started = 1;
+    int32_t tx_frames;
 
-    while(1) {
+    struct mmsghdr mmsg_hdr[thd_opt->msgvec_vlen];
+    struct iovec iov[thd_opt->msgvec_vlen];
+    memset(mmsg_hdr, 0, sizeof(mmsg_hdr));
+    memset(iov, 0, sizeof(iov));
 
-        /*
-        tx_bytes = sendto(thd_opt->sock_fd, thd_opt->tx_buffer,
-                          thd_opt->frame_sz, 0,
-                          (struct sockaddr*)&thd_opt->bind_addr,
-                          sizeof(thd_opt->bind_addr));
-        */
-        
-        // This is a just a little faster than sendto():
-        tx_bytes = send(thd_opt->sock_fd, thd_opt->tx_buffer,
-                          thd_opt->frame_sz, 0);        
+    for (int i = 0; i < thd_opt->msgvec_vlen; i += 1) {
+        iov[i].iov_base = thd_opt->tx_buffer;
+        iov[i].iov_len = thd_opt->frame_sz;
+        mmsg_hdr[i].msg_hdr.msg_iov = &iov[i];
+        mmsg_hdr[i].msg_hdr.msg_iovlen = 1;
+    }
 
-        if (tx_bytes == -1) {
-            perror("Socket Tx error");
+
+    while (1) {
+
+        tx_frames = sendmmsg(thd_opt->sock_fd, mmsg_hdr, thd_opt->msgvec_vlen, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
+
+        if (tx_frames == -1) {
+            printf("Socket Tx error (%d): %s\n", errno, strerror(errno)); ///// Standardise across other TX/Rx calls
+            //perror("Socket Tx error");
             exit(EXIT_FAILURE);
         }
 
-        thd_opt->tx_bytes += tx_bytes;
-        thd_opt->tx_pkts += 1;
-
+        thd_opt->tx_bytes += (tx_frames * thd_opt->frame_sz);
+        thd_opt->tx_pkts += tx_frames;
     }
 
 }

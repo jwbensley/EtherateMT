@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2017 James Bensley.
+ * Copyright (c) 2016-2018 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -229,23 +229,52 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                 get_if_list();
                 return(EX_SOFTWARE);
 
+            // Set the number of packets to batch process with sendmmsg/recvmmsg
+            } else if (strncmp(argv[i], "-m", 2) == 0) {
 
-            // Change to a normal packet socket (no ring buffer)
-            } else if (strncmp(argv[i], "-p", 2) == 0) {
+                if (argc > (i+1)) {
+                    etherate->sk_opt.msgvec_vlen = (uint16_t)strtoul(argv[i+1], NULL, 0);
+                    i += 1;
+                } else {
+                    printf("Oops! Missing back patch count.\n"
+                           "Usage info: %s -h\n", argv[0]);
+                    return EXIT_FAILURE;
+                }
+
+
+            // Use send() packet socket
+            } else if (strncmp(argv[i], "-p1", 3) == 0) {
+
                 etherate->app_opt.sk_type = SKT_PACKET;
 
 
-            // Change to receive mode
+            // Use sendmsg() packet socket
+            } else if (strncmp(argv[i], "-p2", 3) == 0) {
+
+                etherate->app_opt.sk_type = SKT_SENDMSG;
+
+
+            // Use sendmsg() packet socket
+            } else if (strncmp(argv[i], "-p3", 3) == 0) {
+
+                etherate->app_opt.sk_type = SKT_SENDMMSG;
+
+
+            // Run in receive mode
             } else if (strncmp(argv[i], "-r" ,2) == 0)  {
+
                 etherate->app_opt.sk_mode = SKT_RX;
 
 
+            ///// Run in bidirectional mode
             } else if (strncmp(argv[i], "-rt", 3) == 0) {
+
                 etherate->app_opt.sk_mode = SKT_BIDI;
 
 
             // Enable verbose output
             } else if (strncmp(argv[i], "-v" ,2) == 0)  {
+
                 etherate->app_opt.verbose = 1;
 
 
@@ -279,7 +308,7 @@ void etherate_setup(struct etherate *etherate) {
     // All fanout worker threads will belong to the same fanout group
     etherate->app_opt.fanout_grp     = getpid() & 0xffff;
     etherate->app_opt.sk_mode        = SKT_TX;
-    etherate->app_opt.sk_type        = SKT_PACKET_MMAP;
+    etherate->app_opt.sk_type        = SKT_PACKET;
     etherate->app_opt.thd_cnt        = 1;
     etherate->app_opt.thd_sk_affin   = 0;
     etherate->app_opt.verbose        = 0;
@@ -290,11 +319,12 @@ void etherate_setup(struct etherate *etherate) {
     etherate->frm_opt.custom_frame   = 0;
     etherate->frm_opt.frame_nr       = 0;
     etherate->frm_opt.frame_sz       = DEF_FRM_SZ;
-    // Used to load a custom frame payload
+    // Used to load a custom frame payload:
     etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
     
     etherate->sk_opt.if_index        = 0;
     memset(&etherate->sk_opt.if_name, 0, IF_NAMESIZE);
+    etherate->sk_opt.msgvec_vlen      = DEF_MSGVEC_LEN;
 
 }
 
@@ -426,7 +456,7 @@ void get_if_name_by_index(int32_t if_index, uint8_t* if_name) {
 void *print_pps(void *etherate_p) {
 
     struct etherate *etherate  = etherate_p;
-    struct tpacket_stats_v3      tpacket_stats;
+    /////struct tpacket_stats_v3      tpacket_stats;
     uint64_t duration          = 0;
     uint64_t rx_bytes_previous = 0;
     uint64_t rx_drops          = 0;
@@ -491,6 +521,8 @@ void *print_pps(void *etherate_p) {
 
             } else if(etherate->thd_opt[thread].sk_mode == SKT_RX) {
 
+                /*
+                ///// Only if TPACKET V2 or V3 or V4 etc
                 socklen_t stats_len = sizeof(tpacket_stats);
                 int32_t sock_stats = getsockopt(etherate->thd_opt[thread].sock_fd, SOL_PACKET, PACKET_STATISTICS, &sock_stats, &stats_len);
                 if (sock_stats < 0) {
@@ -500,6 +532,7 @@ void *print_pps(void *etherate_p) {
 
                 rx_drops += tpacket_stats.tp_drops;
                 rx_q_frz += tpacket_stats.tp_freeze_q_cnt;
+                */
 
             }
 
@@ -558,12 +591,15 @@ void print_usage () {
             "\t-i\tSet interface by name.\n"
             "\t-I\tSet interface by index.\n"
             "\t-l\tList available interfaces.\n"
-            "\t-p\tSwitch to packet socket, the default is PACKET_MMAP.\n"
+            "\t-m\tSet the number of packets to batch process with sendmmsg/recvmmsg.\n"
+            "\t\tDefault is %" PRIu16 ".\n"
+            "\t-p1\tSwitch to packet socket, the default mode is PACKET_MMAP.\n"
+            "\t-p2\tUse sendmsg to batch process packets, the default mode is PACKET_MMAP.\n"
             "\t-r\tSwitch to Rx mode, the default is Tx.\n"
             "\t-rt\tSwith to bidirectional mode.\n"
             "\t-V|--version Display version\n"
             "\t-h|--help Display this help text\n",
             DEF_BLK_FRM_SZ, DEF_BLK_SZ, DEF_BLK_NR,
-            DEF_FRM_SZ, DEF_FRM_SZ_MAX);
+            DEF_FRM_SZ, DEF_FRM_SZ_MAX, DEF_MSGVEC_LEN); ///// Which PACKET_MMAP version is default? Add version to text.
 
 }

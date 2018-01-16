@@ -25,11 +25,30 @@
 
 
 
-// Rx thread loop using read()
-void *rx_packet(void* thd_opt_p);
+uint16_t frame_count = 21; // What limits this?
+struct msghdr msg_hdr;
+struct iovec iov[frame_count];
+memset(&msg_hdr, 0, sizeof(msg_hdr));
+memset(iov, 0, sizeof(iov));
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t packet_setup_socket(struct thd_opt *thd_opt);
+for (int i = 0; i < frame_count; i += 1) {
+    //memcpy(&iov[i].iov_base, frame_headers->tx_buffer, test_params->f_size_total);
+    iov[i].iov_base = frame_headers->tx_buffer;
+    iov[i].iov_len = test_params->f_size_total;
+}
 
-// Tx thread loop using sendto()
-void *tx_packet(void* thd_opt_p);
+msg_hdr.msg_iov = iov;
+msg_hdr.msg_iovlen = frame_count;
+
+
+                tx_ret = sendmsg(test_interface->sock_fd, &msg_hdr, 0); //// MSG_DONTWAIT ?
+
+                if (tx_ret <= 0)
+                {
+                    perror("Speed test Tx error ");
+                    return;
+                }
+
+
+                test_params->f_tx_count += frame_count;
+                speed_test->b_tx += (test_params->f_size_total * frame_count);

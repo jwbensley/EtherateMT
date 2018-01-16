@@ -1,3 +1,15 @@
+-----EtherateMT 0.4 Beta 2018-01
+
+[FEATURE] Added enhancement #14; Implement recvmsg/sendmsg mode
+
+[FEATURE] Added enhancement #5; Add confirmation when RX hardware timestamping is enabled
+
+[FEATURE] Added enhancement #4; Remove -fstack-protector-all compile flag
+
+[FEATURE] Added enhancement #18; Seperate socket setup into seperate function
+
+
+
 -----EtherateMT 0.3 Alpha 2017-06
 
 [MINOR] Fixed bug in stats fps/Gbps

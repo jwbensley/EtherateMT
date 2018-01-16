@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2017 James Bensley.
+ * Copyright (c) 2016-2018 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,8 +27,12 @@
 
 #include "etherate_mt.h"
 #include "functions.c"
+#include "sock_op.c"
 #include "packet.c"
-#include "packet_mmap.c"
+#include "packet_msg.c"
+#include "packet_mmsg.c"
+#include "tpacket_v2.c"
+#include "tpacket_v3.c"
 
 
 
@@ -65,10 +69,14 @@ int main(int argc, char *argv[]) {
     printf("Frame size set to %d bytes\n", etherate.frm_opt.frame_sz);
 
     if (etherate.app_opt.sk_type == SKT_PACKET_MMAP) {
-        printf("Using PACKET_MMAP.\n");
-        packet_mmap_setup_ring(&etherate);
+        printf("Using raw socket with PACKET_MMAP ring.\n"); ///// Add TPACKET version number
+        tpacket_v2_ring(&etherate);
     } else if (etherate.app_opt.sk_type == SKT_PACKET) {
-        printf("Using raw packet socket.\n");
+        printf("Using raw packet socket with send()/read().\n");
+    } else if (etherate.app_opt.sk_type == SKT_SENDMSG) {
+        printf("Using raw packet socket with sendmsg()/recvmsg().\n");
+    } else if (etherate.app_opt.sk_type == SKT_SENDMMSG) {
+        printf("Using raw packet socket with sendmmsg()/recvmmsg().\n");
     }
 
     if (etherate.app_opt.sk_mode == SKT_RX) {
@@ -78,6 +86,9 @@ int main(int argc, char *argv[]) {
     } else if (etherate.app_opt.sk_mode == SKT_BIDI) {
         printf("Running in bidirectional mode.\n");
     }
+
+
+    ///// Add Kernel version checks here for e.g TPACKETv3 +Tx or +Rx
     
     /////printf("Main is thread %d\n", getpid());
 
@@ -129,6 +140,7 @@ int main(int argc, char *argv[]) {
         etherate.thd_opt[thread].if_index        = etherate.sk_opt.if_index;
         strncpy((char*)etherate.thd_opt[thread].if_name, (char*)etherate.sk_opt.if_name, IF_NAMESIZE);
         etherate.thd_opt[thread].mmap_buf        = NULL;
+        etherate.thd_opt[thread].msgvec_vlen     = etherate.sk_opt.msgvec_vlen;
         etherate.thd_opt[thread].rd              = NULL;
         etherate.thd_opt[thread].rx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
         etherate.thd_opt[thread].rx_bytes        = 0;
@@ -140,6 +152,7 @@ int main(int argc, char *argv[]) {
         memcpy(etherate.thd_opt[thread].tx_buffer, etherate.frm_opt.tx_buffer, DEF_FRM_SZ_MAX);
         etherate.thd_opt[thread].tx_bytes        = 0;
         etherate.thd_opt[thread].tx_pkts         = 0;
+        etherate.thd_opt[thread].verbose         = etherate.app_opt.verbose;
         
 
         ///// Perhaps get the thread to set its own affinity first before it does anything else?
@@ -169,14 +182,28 @@ int main(int argc, char *argv[]) {
         }
 
         uint32_t worker_thread_ret = 0;
-        if (etherate.app_opt.sk_mode) {
+        if (etherate.app_opt.sk_mode == SKT_TX) {
             etherate.thd_opt[thread].sk_mode = SKT_TX;
-            //worker_thread_ret = pthread_create(&worker_thread[thread], &attr[thread], packet_tx, (void*)&etherate.thd_opt[thread]);
-            worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], packet_mmap_tx, (void*)&etherate.thd_opt[thread]);
-        } else {
+            if (etherate.app_opt.sk_type == SKT_PACKET_MMAP) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], tx_tpacket_v2, (void*)&etherate.thd_opt[thread]);
+            } else if (etherate.app_opt.sk_type == SKT_PACKET) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], tx_packet, (void*)&etherate.thd_opt[thread]);
+            } else if (etherate.app_opt.sk_type == SKT_SENDMSG) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], tx_sendmsg, (void*)&etherate.thd_opt[thread]);
+            } else if (etherate.app_opt.sk_type == SKT_SENDMMSG) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], tx_sendmmsg, (void*)&etherate.thd_opt[thread]);
+            }
+        } else if (etherate.app_opt.sk_mode == SKT_RX) {
             etherate.thd_opt[thread].sk_mode = SKT_RX;
-            //worker_thread_ret = pthread_create(&worker_thread[thread], &attr[thread], packet_rx, (void*)&etherate.thd_opt[thread]);
-            worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], packet_mmap_rx, (void*)&etherate.thd_opt[thread]);
+            if (etherate.app_opt.sk_type == SKT_PACKET_MMAP) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], rx_tpacket_v2, (void*)&etherate.thd_opt[thread]);
+            } else if (etherate.app_opt.sk_type == SKT_PACKET) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], rx_packet, (void*)&etherate.thd_opt[thread]);
+            } else if (etherate.app_opt.sk_type == SKT_SENDMSG) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], rx_recvmsg, (void*)&etherate.thd_opt[thread]);
+            } else if (etherate.app_opt.sk_type == SKT_SENDMMSG) {
+                worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], rx_recvmmsg, (void*)&etherate.thd_opt[thread]);
+            }
         }
 
         if (worker_thread_ret) {

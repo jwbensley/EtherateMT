@@ -25,25 +25,40 @@
 
 
 
-#include "packet.h"
+#include "packet_msg.h" ///// Rename this
 
 
 
-void *rx_packet(void* thd_opt_p) {
+void *rx_recvmsg(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
-    int32_t sk_setup_ret = packet_setup_socket(thd_opt_p);
+    int32_t sk_setup_ret = msg_setup_socket(thd_opt_p);
     if (sk_setup_ret != EXIT_SUCCESS) {
         exit(EXIT_FAILURE);
     }
 
-    int32_t rx_bytes;
+
+    int32_t rx_bytes = 0;
     /////thd_opt->started = 1;
+
+    struct msghdr msg_hdr;
+    struct iovec iov;
+    memset(&msg_hdr, 0, sizeof(msg_hdr));
+    memset(&iov, 0, sizeof(iov));
+
+    iov.iov_base = thd_opt->rx_buffer;
+    iov.iov_len = thd_opt->frame_sz;
+
+    msg_hdr.msg_name = NULL;
+    msg_hdr.msg_iov = &iov;
+    msg_hdr.msg_iovlen = 1;
+    msg_hdr.msg_control = NULL;
+    msg_hdr.msg_controllen = 0;
 
     while(1) {
 
-        rx_bytes = read(thd_opt->sock_fd, thd_opt->rx_buffer, DEF_FRM_SZ_MAX); ///// Use recv() with flags?
+        rx_bytes = recvmsg(thd_opt->sock_fd, &msg_hdr, 0);
         
         if (rx_bytes == -1) {
             perror("Socket Rx error");
@@ -59,7 +74,7 @@ void *rx_packet(void* thd_opt_p) {
 
 
 
-int32_t packet_setup_socket(struct thd_opt *thd_opt) {
+int32_t msg_setup_socket(struct thd_opt *thd_opt) {
 
     // Create a raw socket
     thd_opt->sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -84,6 +99,16 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
 
     if (sock_bind == -1) {
         perror("Can't bind to AF_PACKET socket");
+        return EXIT_FAILURE;
+    }
+
+
+    // Increase the socket Tx queue size so that the entire msg vector can fit
+    // into the socket Tx/Rx queue. The Kernel will double the value provided
+    // to allow for sk_buff overhead:
+    int32_t sock_qlen = sock_op(S_O_QLEN_MSG, thd_opt);
+
+    if (sock_qlen == -1) {
         return EXIT_FAILURE;
     }
 
@@ -153,43 +178,45 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
 
 
     return EXIT_SUCCESS;
+
 }
 
 
 
-void *tx_packet(void* thd_opt_p) {
+void *tx_sendmsg(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
-    int32_t sk_setup_ret = packet_setup_socket(thd_opt_p);
+    int32_t sk_setup_ret = msg_setup_socket(thd_opt_p);
     if (sk_setup_ret != EXIT_SUCCESS) {
         exit(EXIT_FAILURE);
     }
 
     int32_t tx_bytes;
-    /////thd_opt->started = 1;
 
-    while(1) {
+    struct msghdr msg_hdr;
+    struct iovec iov;
+    memset(&msg_hdr, 0, sizeof(msg_hdr));
+    memset(&iov, 0, sizeof(iov));
 
-        /*
-        tx_bytes = sendto(thd_opt->sock_fd, thd_opt->tx_buffer,
-                          thd_opt->frame_sz, 0,
-                          (struct sockaddr*)&thd_opt->bind_addr,
-                          sizeof(thd_opt->bind_addr));
-        */
-        
-        // This is a just a little faster than sendto():
-        tx_bytes = send(thd_opt->sock_fd, thd_opt->tx_buffer,
-                          thd_opt->frame_sz, 0);        
+    iov.iov_base = thd_opt->tx_buffer;
+    iov.iov_len = thd_opt->frame_sz;
+
+    msg_hdr.msg_iov = &iov;
+    msg_hdr.msg_iovlen = 1;
+
+    while (1) {
+
+        tx_bytes = sendmsg(thd_opt->sock_fd, &msg_hdr, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
 
         if (tx_bytes == -1) {
-            perror("Socket Tx error");
+            printf("Socket Tx error (%d): %s\n", errno, strerror(errno));
+            //perror("Socket Tx error");
             exit(EXIT_FAILURE);
         }
 
         thd_opt->tx_bytes += tx_bytes;
         thd_opt->tx_pkts += 1;
-
     }
 
 }
