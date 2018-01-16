@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2017 James Bensley.
+ * Copyright (c) 2016-2018 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@
 #include <errno.h>            // errno
 #include <net/ethernet.h>     // ETH_P_ALL
 #include <net/if.h>           // IF_NAMESIZE, struct ifreq
-#include <linux/if_packet.h>  // struct packet_mreq, tpacket_req, tpacket2_hdr, tpacket3_hdr, tpacket_req3
+#include <linux/if_packet.h>  // struct packet_mreq, sockaddr_ll, tpacket_req, tpacket2_hdr, tpacket3_hdr, tpacket_req3
 #include <ifaddrs.h>          // freeifaddrs(), getifaddrs()
 #include <arpa/inet.h>        // htons()
 #include <inttypes.h>         // PRIuN
@@ -51,7 +51,7 @@
 
 
 // Global constants:
-#define app_version "MT 0.3.beta 2017-07"
+#define app_version "MT 0.3.beta 2018-07"
 
 
 
@@ -61,6 +61,7 @@
 #define DEF_BLK_SZ     getpagesize()  // Default block size
 #define DEF_BLK_NR     256            // Default number of blocks per ring
 #define DEF_FRM_SZ_MAX 10000          // Max frame size with headers
+#define DEF_MSGVEC_LEN 256            // Default msgvec_vlen for sendmmsg()/recvmmsg()
 
 // Flags for socket mode:
 #define SKT_RX    0                   // Run in Rx mode
@@ -70,6 +71,8 @@
 // Flags for socket type:
 #define SKT_PACKET        0           // Use read()/sendto()
 #define SKT_PACKET_MMAP   1           // Use PACKET_MMAP Tx/Rx rings
+#define SKT_SENDMSG       2           // Use sendmsg()
+#define SKT_SENDMMSG      3           // Use sendmmsg()
 
 
 
@@ -98,6 +101,7 @@ struct frm_opt {
 struct sk_opt {
     int32_t  if_index;
     uint8_t  if_name[IF_NAMESIZE];
+    uint32_t msgvec_vlen;
 };
 
 // A copy of the values required for each thread
@@ -113,6 +117,7 @@ struct thd_opt {
     int32_t  if_index;
     uint8_t  if_name[IF_NAMESIZE];
     uint8_t* mmap_buf;
+    uint32_t msgvec_vlen;
     struct   iovec* rd; ///// RENAME
     uint8_t  *rx_buffer;
     uint64_t rx_bytes;
@@ -127,6 +132,7 @@ struct thd_opt {
     uint8_t  *tx_buffer;
     uint64_t tx_bytes;
     uint64_t tx_pkts;
+    uint8_t  verbose;
 };
 
 struct etherate {

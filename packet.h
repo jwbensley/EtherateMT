@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2017 James Bensley.
+ * Copyright (c) 2016-2018 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,11 +25,11 @@
 
 
 
-// Rx thread loop for standard read()
-void *packet_rx(void* thd_opt_p);
+// Rx thread loop using read()
+void *rx_packet(void* thd_opt_p);
 
 // Return socket FD for a non Tx/Rx ring socket
 int32_t packet_setup_socket(struct thd_opt *thd_opt);
 
-// Tx thread loop for standard sendto()
-void *packet_tx(void* thd_opt_p);
+// Tx thread loop using sendto()
+void *tx_packet(void* thd_opt_p);

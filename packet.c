@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2017 James Bensley.
+ * Copyright (c) 2016-2018 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@
 
 
 
-void *packet_rx(void* thd_opt_p) {
+void *rx_packet(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
@@ -38,12 +38,12 @@ void *packet_rx(void* thd_opt_p) {
         exit(EXIT_FAILURE);
     }
 
-    int16_t rx_bytes;
+    int32_t rx_bytes;
     /////thd_opt->started = 1;
 
     while(1) {
 
-        rx_bytes = read(thd_opt->sock_fd, thd_opt->rx_buffer, DEF_FRM_SZ_MAX);
+        rx_bytes = read(thd_opt->sock_fd, thd_opt->rx_buffer, DEF_FRM_SZ_MAX); ///// Use recv() with flags?
         
         if (rx_bytes == -1) {
             perror("Socket Rx error");
@@ -70,14 +70,8 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
     }
 
 
-
     // Enable promiscuous mode
-    struct packet_mreq packet_mreq;
-    memset(&packet_mreq, 0, sizeof(packet_mreq));
-    packet_mreq.mr_type    = PACKET_MR_PROMISC;
-    packet_mreq.mr_ifindex = thd_opt->if_index;
-    
-    int32_t sock_promisc = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, (void *)&packet_mreq, sizeof(packet_mreq));
+    int32_t sock_promisc = sock_op(S_O_PROMISC_ADD, thd_opt);
 
     if (sock_promisc == -1) {
         perror("Can't enable promisc mode");
@@ -85,15 +79,8 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
     }
 
 
-
     // Bind socket to interface.
-    memset(&thd_opt->bind_addr, 0, sizeof(thd_opt->bind_addr));
-    thd_opt->bind_addr.sll_family   = AF_PACKET;
-    thd_opt->bind_addr.sll_protocol = htons(ETH_P_ALL);
-    thd_opt->bind_addr.sll_ifindex  = thd_opt->if_index;
-
-    int32_t sock_bind = bind(thd_opt->sock_fd, (struct sockaddr *)&thd_opt->bind_addr,
-                             sizeof(thd_opt->bind_addr));
+    int32_t sock_bind = sock_op(S_O_BIND, thd_opt);
 
     if (sock_bind == -1) {
         perror("Can't bind to AF_PACKET socket");
@@ -101,18 +88,14 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
     }
 
 
-
-    // Bypass the kernel qdisc layer and push packets directly to the driver,
-    // (packet are not buffered, tc disciplines are ignored, Tx support only).
-    // This was added in Linux 3.14.
-    /////if (thd_opt->sk_mode == SKT_TX) {
+    // Bypass the kernel qdisc layer and push packets directly to the driver
+    /////if (thd_opt->sk_mode == SKT_TX) { ///// Check for rx speed increase
 
         #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
-            
-            static const int32_t sock_qdisc_bypass = 1;
-            int32_t sock_qdisc_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
 
-            if (sock_qdisc_ret == -1) {
+            int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
+
+            if (sock_qdisc == -1) {
                 perror("Can't enable QDISC bypass on socket");
                 return EXIT_FAILURE;
             }
@@ -121,75 +104,47 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
     /////}
 
 
-
-    // Request hardware timestamping
-    /*
-    PACKET_TIMESTAMP (with PACKET_RX_RING; since Linux 2.6.36)
-    The packet receive ring always stores a timestamp in the
-    metadata header.  By default, this is a software generated
-    timestamp generated when the packet is copied into the ring
-    
-    For Tx ring by default no timestamp is generated.
-    For the Rx ring if neither TP_STATUS_TS_RAW_HARDWARE or TP_STATUS_TS_SOFTWARE
-    are set a software fallback is invoked *within* PF_PACKET's processing code
-    (less precise) if no hardware timestamp is enabled.
-    Try to off load the Rx timestamp to hardware.
-    */
-    printf("Trying to offload Rx timestamps to hardware...\n");
-
-    // Set the device/hardware timestamping settings:
-    struct hwtstamp_config hwconfig;
-    memset (&hwconfig, 0, sizeof(struct hwtstamp_config));
-    hwconfig.tx_type = HWTSTAMP_TX_OFF;            // Disable all Tx timestamping
-    hwconfig.rx_filter = HWTSTAMP_FILTER_NONE;     // Filter all Rx timestamping
-
-    struct ifreq ifr;
-    memset (&ifr, 0, sizeof(struct ifreq));
-    strncpy (ifr.ifr_name, (char*)thd_opt->if_name, IF_NAMESIZE);
-    ifr.ifr_data = (void *) &hwconfig;
-
-    int32_t nic_tw_ret = ioctl(thd_opt->sock_fd, SIOCSHWTSTAMP, &ifr);
-    if (nic_tw_ret < 0) {
-        perror("Couldn't set hardware timestamp source");
-        // If hardware timestamps aren't support the Kernel will fall back to software
-    }
-
-    // Set the socket timestamping settings:
-    int32_t timesource = 0;
-    timesource |= SOF_TIMESTAMPING_RX_HARDWARE;    // Set Rx timestamps to hardware
-    timesource |= SOF_TIMESTAMPING_RAW_HARDWARE;   // Use hardware time stamps for reporting
-    //timesource |= SOF_TIMESTAMPING_SYS_HARDWARE; // deprecated
-
-    int32_t sock_ts_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_TIMESTAMP, &timesource, sizeof(timesource));
-    if (sock_ts_ret < 0) {
-        perror("Couldn't set socket timestamp source");
-        exit (EXIT_FAILURE);
-    }
-
-
-
-    // Enable packet loss, only supported on Tx
-    ///// Does this have any effect on non-Tx ring transmit?
+    // Enable Tx ring to skip over malformed packets
     if (thd_opt->sk_mode == SKT_TX) {
-        
-        static const int32_t sock_discard = 0;
-        int32_t sock_loss_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_LOSS, (void *)&sock_discard, sizeof(sock_discard));
 
-        if (sock_loss_ret == -1) {
+        int32_t sock_lossy = sock_op(S_O_LOSSY, thd_opt);
+
+        if (sock_lossy == -1) {
             perror("Can't enable PACKET_LOSS on socket");
             return EXIT_FAILURE;
         }
+        
+    }
+
+
+    // Request hardware timestamping of received packets
+    int32_t sock_nic_ts = sock_op(S_O_NIC_TS, thd_opt);
+
+    if (sock_nic_ts == -1) {
+        perror("Couldn't set ring timestamp source");
+        // If hardware timestamps aren't support the Kernel will fall back to
+        // software, no need to exit on error
+    }
+
+
+    // Set the socket timestamping settings:
+    int32_t sock_ts = sock_op(S_O_TS, thd_opt);
+
+    if (sock_ts == -1) {
+        perror("Couldn't set socket Rx timestamp source");
+        /////exit (EXIT_FAILURE); // What is the reason to exit when this fails?
     }
 
 
     // Join this socket to the fanout group
     if (thd_opt->thd_cnt > 1) {
 
-        uint16_t fanout_type = PACKET_FANOUT_CPU; 
-        uint32_t fanout_arg = (thd_opt->fanout_grp | (fanout_type << 16));
-        int32_t  sock_fan_ret = setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_FANOUT, &fanout_arg, sizeof(fanout_arg));
+        //if (thd_opt->verbose)
+        //    printf("Joining thread %d to fanout group %d...\n", thd_opt->thd_id, thd_opt->fanout_grp); ///// Add thread ID/number
 
-        if (sock_fan_ret < 0) {
+        int32_t sock_fanout = sock_op(S_O_FANOUT, thd_opt);
+
+        if (sock_fanout < 0) {
             perror("Can't configure fanout");
             return EXIT_FAILURE;
         }
@@ -202,7 +157,7 @@ int32_t packet_setup_socket(struct thd_opt *thd_opt) {
 
 
 
-void *packet_tx(void* thd_opt_p) {
+void *tx_packet(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
@@ -211,15 +166,21 @@ void *packet_tx(void* thd_opt_p) {
         exit(EXIT_FAILURE);
     }
 
-    int16_t tx_bytes;
+    int32_t tx_bytes;
     /////thd_opt->started = 1;
 
     while(1) {
 
+        /*
         tx_bytes = sendto(thd_opt->sock_fd, thd_opt->tx_buffer,
                           thd_opt->frame_sz, 0,
                           (struct sockaddr*)&thd_opt->bind_addr,
                           sizeof(thd_opt->bind_addr));
+        */
+        
+        // This is a just a little faster than sendto():
+        tx_bytes = send(thd_opt->sock_fd, thd_opt->tx_buffer,
+                          thd_opt->frame_sz, 0);        
 
         if (tx_bytes == -1) {
             perror("Socket Tx error");
