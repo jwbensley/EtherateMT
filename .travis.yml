@@ -1,0 +1,2 @@
+language: c
+script: gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11
