@@ -2,9 +2,15 @@
 
 [MINOR] Set send()/read() as deafult packet Tx/Rx modes
 
-[MINOR] Fixed issue #3; Kernel version check isn't working
+[MAJOR] Fixed issue #3; Kernel version check isn't working
 
 [FEATURE] Added enhancement #23; Merge the `sock_op` cases of `S_O_QLEN_*`
+
+[FEATURE] Added enhancement #21; Standardise on PRIuN formatting throughout
+
+[FEATURE] Added enhancement #24; Add travis-CI
+
+[FEATURE] Added CLI args -p1/-p2/-p3 to switch between PACKET_MMAP, sendmsg() and sendmmsg()
 
 
 
