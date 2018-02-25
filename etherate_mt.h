@@ -46,12 +46,12 @@
 #include "sysexits.h"         // EX_NOPERM, EX_PROTOCOL, EX_SOFTWARE
 #include <linux/net_tstamp.h> // struct hwtstamp_config
 #include <unistd.h>           // getpagesize(), getpid(), getuid(), read(), sleep()
-#include <linux/version.h>    // KERNEL_VERSION(), LINUX_VERSION_CODE
+#include <linux/version.h>    // KERNEL_VERSION(), LINUX_VERSION_CODE ///// Can we renmove this now?
 
 
 
 // Global constants:
-#define app_version "MT 0.3.beta 2018-07"
+#define app_version "MT 0.5.beta 2018-02"
 
 
 
@@ -73,7 +73,7 @@
 #define SKT_PACKET_MMAP   1           // Use PACKET_MMAP Tx/Rx rings
 #define SKT_SENDMSG       2           // Use sendmsg()
 #define SKT_SENDMMSG      3           // Use sendmmsg()
-
+#define DEF_SKT_TYPE      SKT_PACKET  // Default mode
 
 
 // Application behaviour options:
@@ -123,11 +123,12 @@ struct thd_opt {
     uint64_t rx_bytes;
     uint64_t rx_pkts;
     uint8_t  sk_mode;
+    uint8_t  sk_type;
     int32_t  sock_fd;
     uint8_t  started;
     uint16_t thd_cnt;
     uint16_t thd_idx;
-    struct   tpacket_req3 tpacket_req3; // v3 for Rx
+    struct   tpacket_req3 tpacket_req3; // v3 for Rx ///// These need to be wrapped in a Kernel version check?
     struct   tpacket_req  tpacket_req;  // v2 for Tx
     uint8_t  *tx_buffer;
     uint64_t tx_bytes;

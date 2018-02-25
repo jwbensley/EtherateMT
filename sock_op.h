@@ -28,7 +28,7 @@
 #define S_O_PROMISC_ADD 1
 #define S_O_PROMISC_REM 2
 #define S_O_BIND        3
-#define S_O_QLEN_TP23   4
+#define S_O_QLEN        4
 #define S_O_LOSSY       5
 #define S_O_VER_TP2     6
 #define S_O_VER_TP3     7
@@ -39,8 +39,6 @@
 #define S_O_RING_TP3    12
 #define S_O_MMAP_TP23   13
 #define S_O_FANOUT      14
-#define S_O_QLEN_MSG    15
-#define S_O_QLEN_MMSG    16
 
 
 

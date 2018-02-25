@@ -103,7 +103,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                     while (file_ret != EOF &&
                           (etherate->frm_opt.frame_sz < DEF_FRM_SZ_MAX)) {
 
-                        file_ret = fscanf(frame_file, "%hhx", etherate->frm_opt.tx_buffer + etherate->frm_opt.frame_sz);
+                        file_ret = fscanf(frame_file, "%" SCNx8, etherate->frm_opt.tx_buffer + etherate->frm_opt.frame_sz); ///// %hhx
 
                         if (file_ret == EOF) break;
 
@@ -113,10 +113,10 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                     fclose(frame_file);
                     ///// Need to check fclose ret val?
 
-                    printf("Using custom frame (%d octets loaded):\n", etherate->frm_opt.frame_sz);
+                    printf("Using custom frame (%" PRIu16 " octets loaded):\n", etherate->frm_opt.frame_sz);
 
                     for (int i = 0; i <= etherate->frm_opt.frame_sz; i += 1) {
-                        printf ("0x%hhx ", etherate->frm_opt.tx_buffer[i]);
+                        printf ("0x%" PRIx8 " ", etherate->frm_opt.tx_buffer[i]); ///// %hhx
                     }
                     printf("\n");
 
@@ -125,8 +125,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                     if (etherate->frm_opt.frame_sz > 1514) {
                         printf("WARNING: Make sure your device supports baby "
                                "giants or jumbo frames as required\n");
-                    }
-                    if (etherate->frm_opt.frame_sz < 46) {
+                    } else if (etherate->frm_opt.frame_sz < 46) {
                         printf("WARNING: Minimum ethernet payload is 46 bytes, "
                                "Linux may pad the frame out to 46 bytes\n");
                     }
@@ -149,15 +148,14 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
                     if (etherate->frm_opt.frame_sz > DEF_FRM_SZ_MAX) {
                         printf("The frame size is larger than the Etherate buffer size"
-                               " (%d bytes)!\n", DEF_FRM_SZ_MAX);
+                               " (%" PRIi32 " bytes)!\n", DEF_FRM_SZ_MAX);
                         return EX_SOFTWARE;
                     }
 
                     if (etherate->frm_opt.frame_sz > 1514) {
                         printf("WARNING: Make sure your device supports baby "
                                "giants or jumbo frames as required\n");
-                    }
-                    if (etherate->frm_opt.frame_sz < 46) {
+                    } else if (etherate->frm_opt.frame_sz < 46) {
                         printf("WARNING: Minimum ethernet payload is 46 bytes, "
                                "Linux may pad the frame out to 46 bytes\n");
                     }
@@ -181,7 +179,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
             // Set interface by name
             } else if (strncmp(argv[i], "-i", 2) == 0) {
-                ///// If the interface name is wrong we quit with no error
+                ///// If the interface name is wrong we quit with no error!
 
                 if (argc > (i+1)) {
 
@@ -192,7 +190,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                         return EXIT_FAILURE;
                     }
                     
-                    printf("Using inteface %s (%d)\n", etherate->sk_opt.if_name, etherate->sk_opt.if_index);
+                    printf("Using inteface %s (%" PRIi32 ")\n", etherate->sk_opt.if_name, etherate->sk_opt.if_index);
                     i += 1;
 
                 } else {
@@ -214,7 +212,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                         return(EXIT_FAILURE);
                     }
                     
-                    printf("Using inteface %s (%d)\n", etherate->sk_opt.if_name, etherate->sk_opt.if_index);
+                    printf("Using inteface %s (%" PRIi32 ")\n", etherate->sk_opt.if_name, etherate->sk_opt.if_index);
                     i += 1;
 
                 } else {
@@ -242,19 +240,19 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                 }
 
 
-            // Use send() packet socket
+            // Use PACKET_MMAP with sendto()/poll() syscalls
             } else if (strncmp(argv[i], "-p1", 3) == 0) {
 
-                etherate->app_opt.sk_type = SKT_PACKET;
+                etherate->app_opt.sk_type = SKT_PACKET_MMAP;
 
 
-            // Use sendmsg() packet socket
+            // Use sendmsg()/recvmsg() syscalls
             } else if (strncmp(argv[i], "-p2", 3) == 0) {
 
                 etherate->app_opt.sk_type = SKT_SENDMSG;
 
 
-            // Use sendmsg() packet socket
+            // Use sendmmsg()/recvmmsg() syscalls
             } else if (strncmp(argv[i], "-p3", 3) == 0) {
 
                 etherate->app_opt.sk_type = SKT_SENDMMSG;
@@ -308,7 +306,7 @@ void etherate_setup(struct etherate *etherate) {
     // All fanout worker threads will belong to the same fanout group
     etherate->app_opt.fanout_grp     = getpid() & 0xffff;
     etherate->app_opt.sk_mode        = SKT_TX;
-    etherate->app_opt.sk_type        = SKT_PACKET;
+    etherate->app_opt.sk_type        = DEF_SKT_TYPE;
     etherate->app_opt.thd_cnt        = 1;
     etherate->app_opt.thd_sk_affin   = 0;
     etherate->app_opt.verbose        = 0;
@@ -319,7 +317,7 @@ void etherate_setup(struct etherate *etherate) {
     etherate->frm_opt.custom_frame   = 0;
     etherate->frm_opt.frame_nr       = 0;
     etherate->frm_opt.frame_sz       = DEF_FRM_SZ;
-    // Used to load a custom frame payload:
+    // Used to load a custom frame payload from file:
     etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
     
     etherate->sk_opt.if_index        = 0;
@@ -405,8 +403,10 @@ void get_if_list() {
                 }
 
                 // Print the current_cpu_setnt interface details
-                printf("Device %s with address %02x:%02x:%02x:%02x:%02x:%02x, "
-                       "has interface index %d\n", ifreq.ifr_name,
+                printf("Device %s with address "
+                       "%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ", "
+                       "has interface index %" PRIi32 "\n",
+                       ifreq.ifr_name,
                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
                        ifreq.ifr_ifindex);
 
@@ -548,7 +548,7 @@ void *print_pps(void *etherate_p) {
         tx_gbps = ((double)(tx_bytes*8)/1000/1000/1000);
 
         if(etherate->app_opt.verbose) {
-            printf("%" PRIu64 ".\t%.2f Rx Gbps (%" PRIu64 " fps) %lu Drops %lu Q-Freeze\t%.2f Tx Gbps (%" PRIu64 " fps) %lu Drops\n",
+            printf("%" PRIu64 ".\t%.2f Rx Gbps (%" PRIu64 " fps) %lu Drops %lu Q-Freeze\t%.2f Tx Gbps (%" PRIu64 " fps) %" PRIu64 " Drops\n",
                    duration, rx_gbps, rx_pps, rx_drops, rx_q_frz, tx_gbps, tx_pps, tx_drops);
         } else {
             printf("%" PRIu64 ".\t%.2f Rx Gbps (%" PRIu64 " fps)\t%.2f Tx Gbps (%" PRIu64 " fps)\n", duration, rx_gbps, rx_pps, tx_gbps, tx_pps);
@@ -591,12 +591,15 @@ void print_usage () {
             "\t-i\tSet interface by name.\n"
             "\t-I\tSet interface by index.\n"
             "\t-l\tList available interfaces.\n"
-            "\t-m\tSet the number of packets to batch process with sendmmsg/recvmmsg.\n"
+            "\t-m\tSet the number of packets to batch process with sendmmsg()/recvmmsg().\n"
             "\t\tDefault is %" PRIu16 ".\n"
-            "\t-p1\tSwitch to packet socket, the default mode is PACKET_MMAP.\n"
-            "\t-p2\tUse sendmsg to batch process packets, the default mode is PACKET_MMAP.\n"
+            "\t\tThe default send/receive mode processes a single packet per send()/read() syscall.\n" ///// Document this
+            "\t-p1\tUse PACKET_MMAP with PACKET_TX/RX_RING to batch process a ring of packets.\n"
+            "\t-p2\tUse sendmsg()/recvmsg() syscall per packet.\n"
+            "\t-p3\tUse sendmmsg()/recvmmsg() to batch process packets.\n"
             "\t-r\tSwitch to Rx mode, the default is Tx.\n"
             "\t-rt\tSwith to bidirectional mode.\n"
+            "\t-v\tEnable verbose output.\n"
             "\t-V|--version Display version\n"
             "\t-h|--help Display this help text\n",
             DEF_BLK_FRM_SZ, DEF_BLK_SZ, DEF_BLK_NR,

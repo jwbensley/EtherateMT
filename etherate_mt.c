@@ -60,13 +60,15 @@ int main(int argc, char *argv[]) {
         return EX_NOPERM;
     }
 
+    if (etherate.app_opt.verbose) printf("Verbose output enabled.\n");
+
     // Ensure an interface has been chosen
     if (etherate.sk_opt.if_index == 0) {
         printf("No interface chosen!\n");
         return EX_SOFTWARE;
     }
 
-    printf("Frame size set to %d bytes\n", etherate.frm_opt.frame_sz);
+    printf("Frame size set to %" PRIu16 " bytes\n", etherate.frm_opt.frame_sz);
 
     if (etherate.app_opt.sk_type == SKT_PACKET_MMAP) {
         printf("Using raw socket with PACKET_MMAP ring.\n"); ///// Add TPACKET version number
@@ -90,7 +92,7 @@ int main(int argc, char *argv[]) {
 
     ///// Add Kernel version checks here for e.g TPACKETv3 +Tx or +Rx
     
-    /////printf("Main is thread %d\n", getpid());
+    /////printf("Main is thread %" PRIu32 "\n", getpid());
 
     
     // Fill the test frame buffer with random data
@@ -145,7 +147,9 @@ int main(int argc, char *argv[]) {
         etherate.thd_opt[thread].rx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
         etherate.thd_opt[thread].rx_bytes        = 0;
         etherate.thd_opt[thread].rx_pkts         = 0;
-        etherate.thd_opt[thread].started         = 0;
+        etherate.thd_opt[thread].started         = 0; /////
+        etherate.thd_opt[thread].sk_mode         = etherate.app_opt.sk_mode;
+        etherate.thd_opt[thread].sk_type         = etherate.app_opt.sk_type;
         etherate.thd_opt[thread].thd_cnt         = etherate.app_opt.thd_cnt;
         etherate.thd_opt[thread].thd_idx         = thread;
         etherate.thd_opt[thread].tx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
@@ -183,7 +187,6 @@ int main(int argc, char *argv[]) {
 
         uint32_t worker_thread_ret = 0;
         if (etherate.app_opt.sk_mode == SKT_TX) {
-            etherate.thd_opt[thread].sk_mode = SKT_TX;
             if (etherate.app_opt.sk_type == SKT_PACKET_MMAP) {
                 worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], tx_tpacket_v2, (void*)&etherate.thd_opt[thread]);
             } else if (etherate.app_opt.sk_type == SKT_PACKET) {
@@ -194,7 +197,6 @@ int main(int argc, char *argv[]) {
                 worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], tx_sendmmsg, (void*)&etherate.thd_opt[thread]);
             }
         } else if (etherate.app_opt.sk_mode == SKT_RX) {
-            etherate.thd_opt[thread].sk_mode = SKT_RX;
             if (etherate.app_opt.sk_type == SKT_PACKET_MMAP) {
                 worker_thread_ret = pthread_create(&worker_thread[thread], &worker_attr[thread], rx_tpacket_v2, (void*)&etherate.thd_opt[thread]);
             } else if (etherate.app_opt.sk_type == SKT_PACKET) {
@@ -207,7 +209,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (worker_thread_ret) {
-          printf("Return code from worker thread creation is %d\n", worker_thread_ret);
+          printf("Return code from worker thread creation is %" PRIi32 "\n", worker_thread_ret);
           exit(EXIT_FAILURE);
         }
 
@@ -232,10 +234,10 @@ int main(int argc, char *argv[]) {
         free(etherate.thd_opt[thread].tx_buffer);
 
         if (worker_join_ret) {
-            printf("Return code from worker thread join is %d\n", worker_join_ret);
+            printf("Return code from worker thread join is %" PRIi32 "\n", worker_join_ret);
             exit(EXIT_FAILURE);
         }
-        printf("Main: completed join with thread %d having a status of %ld\n", thread, (long)thread_status);
+        printf("Main: completed join with thread %" PRIi32 " having a status of %" PRIi64 "\n", thread, (long)thread_status);
     }
 
     free(etherate.thd_opt);
@@ -244,7 +246,7 @@ int main(int argc, char *argv[]) {
     void *thread_status;
     stats_thread_ret = pthread_join(stats_thread, &thread_status);
     if (stats_thread_ret) {
-        printf("Return code from stats thread join is %d\n", stats_thread_ret);
+        printf("Return code from stats thread join is %" PRIi32 "\n", stats_thread_ret);
         exit(EXIT_FAILURE);
     }
 

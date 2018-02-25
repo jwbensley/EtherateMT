@@ -33,7 +33,7 @@ void *rx_tpacket_v2(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
-    /////printf("This is thread %d\n", gettid());
+    /////printf("This is thread %" PRIu32 "\n", gettid());
 
     int32_t sk_setup_ret = tpacket_v2_sock(thd_opt_p);
     if (sk_setup_ret != EXIT_SUCCESS) {
@@ -109,7 +109,7 @@ void tpacket_v2_ring(struct etherate *etherate) {
     if (etherate->frm_opt.block_sz < etherate->frm_opt.block_frm_sz) {
         
         if (etherate->app_opt.verbose)
-            printf("Block size (%d) is less than block frame size (%d), padding to %d!\n.",
+            printf("Block size (%" PRIu32 ") is less than block frame size (%" PRIu32 "), padding to %" PRIu32 "!\n.",
                    etherate->frm_opt.block_sz,
                    etherate->frm_opt.block_frm_sz,
                    etherate->frm_opt.block_frm_sz);
@@ -125,7 +125,7 @@ void tpacket_v2_ring(struct etherate *etherate) {
         uint32_t base = (etherate->frm_opt.block_sz / getpagesize()) + 1;
         
         if (etherate->app_opt.verbose)
-            printf("Block size (%d) is not a multiple of the page size (%d), padding to %d!\n",
+            printf("Block size (%" PRIu32 ") is not a multiple of the page size (%" PRIu32 "), padding to %" PRIu32 "!\n",
                     etherate->frm_opt.block_sz,
                     getpagesize(),
                     (base * getpagesize()));
@@ -150,7 +150,7 @@ void tpacket_v2_ring(struct etherate *etherate) {
     if ((block_frm_nr != 1) && (is_power_of_two != 1)) {
 
         if (etherate->app_opt.verbose)
-            printf("Frames per block (%u) must be 1 or a power of 2!\n", block_frm_nr);
+            printf("Frames per block (%" PRIu32 ") must be 1 or a power of 2!\n", block_frm_nr);
 
         next_power = block_frm_nr;
         next_power -= 1;
@@ -172,10 +172,10 @@ void tpacket_v2_ring(struct etherate *etherate) {
         block_frm_nr = etherate->frm_opt.block_sz / etherate->frm_opt.block_frm_sz;
 
         if (etherate->app_opt.verbose) {
-            printf("Frames per block increased to %d and block size increased to %u.\n",
+            printf("Frames per block increased to %" PRIu32 " and block size increased to %" PRIu32 ".\n",
                     block_frm_nr, etherate->frm_opt.block_sz);
 
-            printf("Block frame size increased to %u to evenly fill block.\n",
+            printf("Block frame size increased to %" PRIu32 " to evenly fill block.\n",
                     etherate->frm_opt.block_frm_sz);
         }
 
@@ -189,7 +189,7 @@ void tpacket_v2_ring(struct etherate *etherate) {
          etherate->frm_opt.block_frm_sz = etherate->frm_opt.block_sz / base;
 
          if (etherate->app_opt.verbose)
-             printf("Block frame size increased to %u to evenly fill block.\n",
+             printf("Block frame size increased to %" PRIu32 " to evenly fill block.\n",
                     etherate->frm_opt.block_frm_sz);
 
     }
@@ -199,7 +199,7 @@ void tpacket_v2_ring(struct etherate *etherate) {
     etherate->frm_opt.frame_nr = (etherate->frm_opt.block_sz * etherate->frm_opt.block_nr) / etherate->frm_opt.block_frm_sz;
 
     if (etherate->app_opt.verbose)
-        printf("Frame block size %d, frames per block %d, block size %d, block number %d, frames in ring %d\n",
+        printf("Frame block size %" PRIu32 ", frames per block %" PRIu32 ", block size %" PRIu32 ", block number %" PRIu32 ", frames in ring %" PRIu32 "\n",
                etherate->frm_opt.block_frm_sz,
                block_frm_nr,
                etherate->frm_opt.block_sz,
@@ -207,7 +207,7 @@ void tpacket_v2_ring(struct etherate *etherate) {
                etherate->frm_opt.frame_nr);
 
     if ((block_frm_nr * etherate->frm_opt.block_nr) != etherate->frm_opt.frame_nr) {
-        printf("Frames per block (%d) * block number (%d) != frame number in ring (%d)!\n",
+        printf("Frames per block (%" PRIu32 ") * block number (%" PRIu32 ") != frame number in ring (%" PRIu32 ")!\n",
                block_frm_nr, etherate->frm_opt.block_nr, etherate->frm_opt.frame_nr);
     }
 
@@ -246,10 +246,10 @@ int32_t tpacket_v2_sock(struct thd_opt *thd_opt) {
     }
 
 
-    // Increase the socket Tx queue size so that the entire PACKET_MMAP Tx ring
+    // Increase the socket Tx/Rx queue size so that the entire PACKET_MMAP ring
     // can fit into the socket Tx queue. The Kernel will double the value provided
     // to allow for sk_buff overhead:
-    int32_t sock_qlen = sock_op(S_O_QLEN_TP23, thd_opt);
+    int32_t sock_qlen = sock_op(S_O_QLEN, thd_opt);
 
     if (sock_qlen == -1) {
         return EXIT_FAILURE;
@@ -257,19 +257,12 @@ int32_t tpacket_v2_sock(struct thd_opt *thd_opt) {
 
 
     // Bypass the kernel qdisc layer and push packets directly to the driver
-    /////if (thd_opt->sk_mode == SKT_TX) { ///// Check for rx speed increase
+    int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
 
-        #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
-
-            int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
-
-            if (sock_qdisc == -1) {
-                perror("Can't enable QDISC bypass on socket");
-                return EXIT_FAILURE;
-            }
-
-        #endif
-    /////}
+    if (sock_qdisc == -1) {
+        perror("Can't enable QDISC bypass on socket");
+        return EXIT_FAILURE;
+    }
 
 
     // Enable Tx ring to skip over malformed packets
@@ -300,7 +293,6 @@ int32_t tpacket_v2_sock(struct thd_opt *thd_opt) {
 
     if (sock_ts == -1) {
         perror("Couldn't set socket Rx timestamp source");
-        /////exit (EXIT_FAILURE); // What is the reason to exit when this fails?
     }
 
 
@@ -340,7 +332,7 @@ int32_t tpacket_v2_sock(struct thd_opt *thd_opt) {
     if (thd_opt->thd_cnt > 1) {
 
         //if (thd_opt->verbose)
-        //    printf("Joining thread %d to fanout group %d...\n", thd_opt->thd_id, thd_opt->fanout_grp); ///// Add thread ID/number
+        //    printf("Joining thread %" PRIu16 "" to fanout group %" PRId32 "...\n", thd_opt->thd_id, thd_opt->fanout_grp); ///// Add thread ID/number
 
         int32_t sock_fanout = sock_op(S_O_FANOUT, thd_opt);
 

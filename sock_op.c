@@ -61,174 +61,28 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
             return bind(thd_opt->sock_fd, (struct sockaddr *)&thd_opt->bind_addr,
                                      sizeof(thd_opt->bind_addr));
 
-        
-        // Set the socket Tx or Rx queue length for TPACKET v2, the Kernel will
-        // double the value provided to allow for sk_buff overhead:
-        case S_O_QLEN_TP23:
 
-            if (thd_opt->sk_mode == SKT_TX) {
+        // Set the socket Tx or Rx queue length, the Kernel will double
+        // the value provided to allow for sk_buff overhead:
+        case S_O_QLEN:
 
-                int32_t sock_wmem_cur;
-                socklen_t read_len = sizeof(sock_wmem_cur);
+            ;
+            int32_t sock_wmem;
+            int32_t sock_rmem;
 
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur,
-                               &read_len) < 0) {
-
-                    perror("Can't get the socket write buffer size");
-                    return -1;
-                }
-
-                int32_t sock_wmem = (thd_opt->block_sz * thd_opt->block_nr);
-
-                if (sock_wmem_cur < sock_wmem) {
-
-                    if (thd_opt->verbose)
-                        printf("Current socket write buffer size is %d bytes, "
-                               "desired write buffer size is %d bytes.\n"
-                               "Trying to increase to %d bytes...\n",
-                               sock_wmem_cur, sock_wmem, sock_wmem);
-
-                    if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
-                                   sizeof(sock_wmem)) < 0) {
-
-                        perror("Can't set the socket write buffer size");
-                        return -1;
-                    }
-                    
-                    if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur,
-                                   &read_len) < 0) {
-
-                        perror("Can't get the socket write buffer size");
-                        return -1;
-                    }
-
-
-                    printf("Write buffer size set to %d bytes\n", sock_wmem_cur);
-
-
-                    if (sock_wmem_cur < sock_wmem) {
-
-                        if (thd_opt->verbose)
-                            printf("Write buffer still too small!\n"
-                                   "Trying to force to %d bytes...\n",
-                                   sock_wmem);
-                        
-                        if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
-                                       &sock_wmem, sizeof(sock_wmem)) < 0) {
-
-                            perror("Can't force the socket write buffer size");
-                            return -1;
-                        }
-                        
-                        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF,
-                                       &sock_wmem_cur, &read_len) < 0) {
-
-                            perror("Can't get the socket write buffer size");
-                            return -1;
-                          }
-                        
-                        // When the buffer size is forced the kernel sets a value double
-                        // the requested size to allow for accounting/meta data space
-                        if (thd_opt->verbose)
-                            printf("Forced write buffer size is now %d bytes\n", (sock_wmem_cur/2));
-
-                        if (sock_wmem_cur < sock_wmem) {
-                            printf("Write buffer still smaller than desired!\n");
-                        }
-
-                    }
-
-                }
-
-                return EXIT_SUCCESS;
-
-
-            // Increase the socket read queue size, the same as above for Tx
-            } else if (thd_opt->sk_mode == SKT_RX) {
-
-
-                int32_t sock_rmem_cur;
-                socklen_t read_len = sizeof(sock_rmem_cur);
-
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_RCVBUF, &sock_rmem_cur,
-                               &read_len) < 0) {
-
-                    perror("Can't get the socket read buffer size");
-                    return -1;
-                }
-
-                int32_t sock_rmem = (thd_opt->block_sz * thd_opt->block_nr);
-
-                if (sock_rmem_cur < sock_rmem) {
-
-                    if (thd_opt->verbose)
-                        printf("Current socket read buffer size is %d bytes, "
-                               "desired read buffer size is %d bytes.\n"
-                               "Trying to increase to %d bytes...\n",
-                               sock_rmem_cur, sock_rmem, sock_rmem);
-
-                    if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem,
-                                   sizeof(sock_rmem)) < 0) {
-
-                        perror("Can't set the socket read buffer size");
-                        return -1;
-                    }
-                    
-                    if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem_cur,
-                                   &read_len) < 0) {
-
-                        perror("Can't get the socket read buffer size");
-                        return -1;
-                    }
-
-
-                    printf("Read buffer size set to %d bytes\n", sock_rmem_cur);
-
-
-                    if (sock_rmem_cur < sock_rmem) {
-
-                        if (thd_opt->verbose)
-                            printf("Read buffer still too small!\n"
-                                   "Trying to force to %d bytes...\n",
-                                   sock_rmem);
-                        
-                        if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
-                                       &sock_rmem, sizeof(sock_rmem))<0) {
-
-                            perror("Can't force the socket read buffer size");
-                            return -1;
-                        }
-                        
-                        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF,
-                                       &sock_rmem_cur, &read_len) < 0) {
-
-                            perror("Can't get the socket read buffer size");
-                            return -1;
-                          }
-                        
-                        // When the buffer size is forced the kernel sets a value double
-                        // the requested size to allow for accounting/meta data space
-                        if (thd_opt->verbose)
-                            printf("Forced read buffer size is now %d bytes\n", (sock_rmem_cur/2));
-
-                        if (sock_rmem_cur < sock_rmem) {
-                            printf("Read buffer Still smaller than desired!\n");
-                        }
-
-
-                    }
-
-                }
-
-                return EXIT_SUCCESS;
-
+            if (thd_opt->sk_type == SKT_PACKET_MMAP) {
+              sock_wmem = (thd_opt->block_sz * thd_opt->block_nr);
+              sock_rmem = (thd_opt->block_sz * thd_opt->block_nr);
+            } else if (thd_opt->sk_type == SKT_SENDMSG) {
+              sock_wmem = (thd_opt->msgvec_vlen * thd_opt->frame_sz);
+              sock_rmem = (thd_opt->msgvec_vlen * DEF_FRM_SZ_MAX); ///// align to recvmsg_rx
+            } else if (thd_opt->sk_type == SKT_SENDMMSG) {
+              sock_wmem = (thd_opt->msgvec_vlen * thd_opt->frame_sz);
+              sock_rmem = (thd_opt->msgvec_vlen * DEF_FRM_SZ_MAX); ///// align to recvmsg_rx
+            } else {
+              return -1; // Unsupported/undefined socket type
             }
 
-
-        // Set the socket Tx or Rx queue length for msg vector, the Kernel will
-        // double the value provided to allow for sk_buff overhead:
-        case S_O_QLEN_MSG:
-
             if (thd_opt->sk_mode == SKT_TX) {
 
                 int32_t sock_wmem_cur;
@@ -241,14 +95,12 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                     return -1;
                 }
 
-                int32_t sock_wmem = (thd_opt->msgvec_vlen * thd_opt->frame_sz);
-
                 if (sock_wmem_cur < sock_wmem) {
 
                     if (thd_opt->verbose)
-                        printf("Current socket write buffer size is %d bytes, "
-                               "desired write buffer size is %d bytes.\n"
-                               "Trying to increase to %d bytes...\n",
+                        printf("Current socket write buffer size is %" PRIi32 " bytes, "
+                               "desired write buffer size is %" PRIi32 " bytes.\n"
+                               "Trying to increase to %" PRIi32 " bytes...\n",
                                sock_wmem_cur, sock_wmem, sock_wmem);
 
                     if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
@@ -266,14 +118,14 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                     }
 
 
-                    printf("Write buffer size set to %d bytes\n", sock_wmem_cur);
+                    printf("Write buffer size set to %" PRIi32 " bytes\n", sock_wmem_cur);
 
 
                     if (sock_wmem_cur < sock_wmem) {
 
                         if (thd_opt->verbose)
                             printf("Write buffer still too small!\n"
-                                   "Trying to force to %d bytes...\n",
+                                   "Trying to force to %" PRIi32 " bytes...\n",
                                    sock_wmem);
                         
                         if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
@@ -293,7 +145,7 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                         // When the buffer size is forced the kernel sets a value double
                         // the requested size to allow for accounting/meta data space
                         if (thd_opt->verbose)
-                            printf("Forced write buffer size is now %d bytes\n", (sock_wmem_cur/2));
+                            printf("Forced write buffer size is now %" PRIi32 " bytes\n", (sock_wmem_cur/2));
 
                         if (sock_wmem_cur < sock_wmem) {
                             printf("Write buffer still smaller than desired!\n");
@@ -309,7 +161,6 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
             // Increase the socket read queue size, the same as above for Tx
             } else if (thd_opt->sk_mode == SKT_RX) {
 
-
                 int32_t sock_rmem_cur;
                 socklen_t read_len = sizeof(sock_rmem_cur);
 
@@ -320,14 +171,12 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                     return -1;
                 }
 
-                int32_t sock_rmem = (thd_opt->msgvec_vlen * DEF_FRM_SZ_MAX); ///// align to recvmsg_rx
-
                 if (sock_rmem_cur < sock_rmem) {
 
                     if (thd_opt->verbose)
-                        printf("Current socket read buffer size is %d bytes, "
-                               "desired read buffer size is %d bytes.\n"
-                               "Trying to increase to %d bytes...\n",
+                        printf("Current socket read buffer size is %" PRIi32 " bytes, "
+                               "desired read buffer size is %" PRIi32 " bytes.\n"
+                               "Trying to increase to %" PRIi32 " bytes...\n",
                                sock_rmem_cur, sock_rmem, sock_rmem);
 
                     if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem,
@@ -345,14 +194,14 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                     }
 
 
-                    printf("Read buffer size set to %d bytes\n", sock_rmem_cur);
+                    printf("Read buffer size set to %" PRIi32 " bytes\n", sock_rmem_cur);
 
 
                     if (sock_rmem_cur < sock_rmem) {
 
                         if (thd_opt->verbose)
                             printf("Read buffer still too small!\n"
-                                   "Trying to force to %d bytes...\n",
+                                   "Trying to force to %" PRIi32 " bytes...\n",
                                    sock_rmem);
                         
                         if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
@@ -372,170 +221,7 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                         // When the buffer size is forced the kernel sets a value double
                         // the requested size to allow for accounting/meta data space
                         if (thd_opt->verbose)
-                            printf("Forced read buffer size is now %d bytes\n", (sock_rmem_cur/2));
-
-                        if (sock_rmem_cur < sock_rmem) {
-                            printf("Read buffer Still smaller than desired!\n");
-                        }
-
-
-                    }
-
-                }
-
-                return EXIT_SUCCESS;
-
-            }
-
-
-        // Set the socket Tx or Rx queue length for msg vector, the Kernel will
-        // double the value provided to allow for sk_buff overhead:
-        case S_O_QLEN_MMSG:
-
-            if (thd_opt->sk_mode == SKT_TX) {
-
-                int32_t sock_wmem_cur;
-                socklen_t read_len = sizeof(sock_wmem_cur);
-
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur,
-                               &read_len) < 0) {
-
-                    perror("Can't get the socket write buffer size");
-                    return -1;
-                }
-
-                int32_t sock_wmem = (thd_opt->msgvec_vlen * thd_opt->frame_sz);
-
-                if (sock_wmem_cur < sock_wmem) {
-
-                    if (thd_opt->verbose)
-                        printf("Current socket write buffer size is %d bytes, "
-                               "desired write buffer size is %d bytes.\n"
-                               "Trying to increase to %d bytes...\n",
-                               sock_wmem_cur, sock_wmem, sock_wmem);
-
-                    if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
-                                   sizeof(sock_wmem)) < 0) {
-
-                        perror("Can't set the socket write buffer size");
-                        return -1;
-                    }
-                    
-                    if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur,
-                                   &read_len) < 0) {
-
-                        perror("Can't get the socket write buffer size");
-                        return -1;
-                    }
-
-
-                    printf("Write buffer size set to %d bytes\n", sock_wmem_cur);
-
-
-                    if (sock_wmem_cur < sock_wmem) {
-
-                        if (thd_opt->verbose)
-                            printf("Write buffer still too small!\n"
-                                   "Trying to force to %d bytes...\n",
-                                   sock_wmem);
-                        
-                        if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
-                                       &sock_wmem, sizeof(sock_wmem)) < 0) {
-
-                            perror("Can't force the socket write buffer size");
-                            return -1;
-                        }
-                        
-                        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF,
-                                       &sock_wmem_cur, &read_len) < 0) {
-
-                            perror("Can't get the socket write buffer size");
-                            return -1;
-                          }
-                        
-                        // When the buffer size is forced the kernel sets a value double
-                        // the requested size to allow for accounting/meta data space
-                        if (thd_opt->verbose)
-                            printf("Forced write buffer size is now %d bytes\n", (sock_wmem_cur/2));
-
-                        if (sock_wmem_cur < sock_wmem) {
-                            printf("Write buffer still smaller than desired!\n");
-                        }
-
-                    }
-
-                }
-
-                return EXIT_SUCCESS;
-
-
-            // Increase the socket read queue size, the same as above for Tx
-            } else if (thd_opt->sk_mode == SKT_RX) {
-
-
-                int32_t sock_rmem_cur;
-                socklen_t read_len = sizeof(sock_rmem_cur);
-
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_RCVBUF, &sock_rmem_cur,
-                               &read_len) < 0) {
-
-                    perror("Can't get the socket read buffer size");
-                    return -1;
-                }
-
-                int32_t sock_rmem = (thd_opt->msgvec_vlen * DEF_FRM_SZ_MAX); ///// align to recvmsg_rx
-
-                if (sock_rmem_cur < sock_rmem) {
-
-                    if (thd_opt->verbose)
-                        printf("Current socket read buffer size is %d bytes, "
-                               "desired read buffer size is %d bytes.\n"
-                               "Trying to increase to %d bytes...\n",
-                               sock_rmem_cur, sock_rmem, sock_rmem);
-
-                    if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem,
-                                   sizeof(sock_rmem)) < 0) {
-
-                        perror("Can't set the socket read buffer size");
-                        return -1;
-                    }
-                    
-                    if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem_cur,
-                                   &read_len) < 0) {
-
-                        perror("Can't get the socket read buffer size");
-                        return -1;
-                    }
-
-
-                    printf("Read buffer size set to %d bytes\n", sock_rmem_cur);
-
-
-                    if (sock_rmem_cur < sock_rmem) {
-
-                        if (thd_opt->verbose)
-                            printf("Read buffer still too small!\n"
-                                   "Trying to force to %d bytes...\n",
-                                   sock_rmem);
-                        
-                        if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
-                                       &sock_rmem, sizeof(sock_rmem))<0) {
-
-                            perror("Can't force the socket read buffer size");
-                            return -1;
-                        }
-                        
-                        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF,
-                                       &sock_rmem_cur, &read_len) < 0) {
-
-                            perror("Can't get the socket read buffer size");
-                            return -1;
-                          }
-                        
-                        // When the buffer size is forced the kernel sets a value double
-                        // the requested size to allow for accounting/meta data space
-                        if (thd_opt->verbose)
-                            printf("Forced read buffer size is now %d bytes\n", (sock_rmem_cur/2));
+                            printf("Forced read buffer size is now %" PRIi32 " bytes\n", (sock_rmem_cur/2));
 
                         if (sock_rmem_cur < sock_rmem) {
                             printf("Read buffer Still smaller than desired!\n");
@@ -626,9 +312,13 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
         case S_O_QDISC:
 
             ;
-            static const int32_t sock_qdisc_bypass = 1;
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
-
+            #if !defined(PACKET_QDISC_BYPASS)
+                return EXIT_SUCCESS;
+            #else
+                static const int32_t sock_qdisc_bypass = 1;
+                return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
+            #endif
+            
 
         // Define a TPACKET v2 Tx/Rx ring buffer
         case S_O_RING_TP2:

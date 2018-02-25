@@ -1,3 +1,13 @@
+-----EtherateMT 0.5 Beta 2018-02
+
+[MINOR] Set send()/read() as deafult packet Tx/Rx modes
+
+[MINOR] Fixed issue #3; Kernel version check isn't working
+
+[FEATURE] Added enhancement #23; Merge the `sock_op` cases of `S_O_QLEN_*`
+
+
+
 -----EtherateMT 0.4 Beta 2018-01
 
 [FEATURE] Added enhancement #14; Implement recvmsg/sendmsg mode

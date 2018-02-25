@@ -25,7 +25,7 @@
 
 
 
-#include "packet_msg.h" ///// Rename this
+#include "packet_msg.h"
 
 
 
@@ -103,30 +103,13 @@ int32_t msg_setup_socket(struct thd_opt *thd_opt) {
     }
 
 
-    // Increase the socket Tx queue size so that the entire msg vector can fit
-    // into the socket Tx/Rx queue. The Kernel will double the value provided
-    // to allow for sk_buff overhead:
-    int32_t sock_qlen = sock_op(S_O_QLEN_MSG, thd_opt);
+    // Bypass the kernel qdisc layer and push packets directly to the driver
+    int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
 
-    if (sock_qlen == -1) {
+    if (sock_qdisc == -1) {
+        perror("Can't enable QDISC bypass on socket");
         return EXIT_FAILURE;
     }
-
-
-    // Bypass the kernel qdisc layer and push packets directly to the driver
-    /////if (thd_opt->sk_mode == SKT_TX) { ///// Check for rx speed increase
-
-        #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
-
-            int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
-
-            if (sock_qdisc == -1) {
-                perror("Can't enable QDISC bypass on socket");
-                return EXIT_FAILURE;
-            }
-
-        #endif
-    /////}
 
 
     // Enable Tx ring to skip over malformed packets
@@ -157,7 +140,6 @@ int32_t msg_setup_socket(struct thd_opt *thd_opt) {
 
     if (sock_ts == -1) {
         perror("Couldn't set socket Rx timestamp source");
-        /////exit (EXIT_FAILURE); // What is the reason to exit when this fails?
     }
 
 
@@ -165,7 +147,7 @@ int32_t msg_setup_socket(struct thd_opt *thd_opt) {
     if (thd_opt->thd_cnt > 1) {
 
         //if (thd_opt->verbose)
-        //    printf("Joining thread %d to fanout group %d...\n", thd_opt->thd_id, thd_opt->fanout_grp); ///// Add thread ID/number
+        //    printf("Joining thread %" PRIu16 "" to fanout group %" PRId32 "...\n", thd_opt->thd_id, thd_opt->fanout_grp); ///// Add thread ID/number
 
         int32_t sock_fanout = sock_op(S_O_FANOUT, thd_opt);
 
