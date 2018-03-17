@@ -25,11 +25,14 @@
 
 
 
-// Rx thread loop using read()
-void *rx_packet(void* thd_opt_p);
+// Worker thread entry function
+void *packet_init(void* thd_opt_p);
 
 // Return socket FD for a non Tx/Rx ring socket
-int32_t packet_setup_socket(struct thd_opt *thd_opt);
+int32_t packet_sock(struct thd_opt *thd_opt);
+
+// Rx thread loop using read()
+void packet_rx(struct thd_opt *thd_opt);
 
 // Tx thread loop using sendto()
-void *tx_packet(void* thd_opt_p);
+void packet_tx(struct thd_opt *thd_opt);

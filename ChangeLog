@@ -1,3 +1,25 @@
+-----EtherateMT 0.6 Beta 2018-03
+
+[MINOR] Fixed issue #29; Added check for fclose return value
+
+[MINOR] Fixed issue #28; Incorrect interface selection produced no error
+
+[MINOR] Fixed issue #8; Stats thread starts before the worker thread(s)
+
+[MINOR] Fixed issue #2; Stats are overflowing
+
+[FEATURE] Added enhancement #30; Add a Kernel version check for PACKET_QDISC_BYPASS, TPACKET V2 and V3
+
+[FEATURE] Added enhancement #25; print_pps breakout
+
+[FEATURE] Added enhancement #12; Separate TPACKET v2 and v3 code
+
+[FEATURE] Added enhancement #9; Add -v verbose flag
+
+[FEATURE] Added enhancement #6; Include PACKET_MMAP version in debug output
+
+
+
 -----EtherateMT 0.5 Beta 2018-02
 
 [MINOR] Set send()/read() as deafult packet Tx/Rx modes

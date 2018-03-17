@@ -25,11 +25,14 @@
 
 
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t mmsg_setup_socket(struct thd_opt *thd_opt);
+// Worker thread entry function
+void *mmsg_init(void* thd_opt_p);
 
 // Rx thread loop using recvmmsg()
-void *rx_recvmmsg(void* thd_opt_p);
+void mmsg_rx(struct thd_opt *thd_opt);
+
+// Return socket FD for a non Tx/Rx ring socket
+int32_t mmsg_sock(struct thd_opt *thd_opt);
 
 // Tx thread loop using sendmmsg()
-void *tx_sendmmsg(void* thd_opt_p);
+void mmsg_tx(struct thd_opt *thd_opt);

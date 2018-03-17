@@ -1,5 +1,8 @@
 # EtherateMT
 
+[![Build Status](https://travis-ci.org/jwbensley/EtherateMT.svg?branch=master)](https://travis-ci.org/jwbensley/EtherateMT)
+[![PayPal Donate](https://img.shields.io/badge/paypal-donate-green.svg) < buy me a pizza!](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=james%40bensley%2eme&lc=GB&item_name=EtherateMT&currency_code=GBP)  
+
 Etherate is a Linux CLI application for testing layer 2 Ethernet and MPLS  
 connectivity. It can generate various Ethernet and MPLS frames for testing  
 different devices such as switches/routers/firewalls etc, to test  

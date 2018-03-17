@@ -24,15 +24,23 @@
  */
 
 
+// Worker thread entry function
+void *tpacket_v2_init(void* thd_opt_p);
+
+// TX/RX_RING ring/block alignment
+void tpacket_v2_ring_align(struct thd_opt *thd_opt);
+
+// TX/RX_RING init
+void tpacket_v2_ring_init(struct thd_opt *thd_opt);
 
 // PACKET_MMAP Rx thread loop
-void *rx_tpacket_v2(void* thd_opt_p);
-
-// PACKET_MMAP ring/block alignment
-void tpacket_v2_ring(struct etherate *etherate);
+void tpacket_v2_rx(struct thd_opt *thd_opt);
 
 // Return PACKET_MMAP socket FD
 int32_t tpacket_v2_sock(struct thd_opt *thd_opt);
 
+// TPACKET V2 Rx socket stats
+void tpacket_v2_stats(struct thd_opt *thd_opt, uint64_t *rx_drops);
+
 // PACKET_MMAP Tx thread loop
-void *tx_tpacket_v2(void* thd_opt_p);
+void tpacket_v2_tx(struct thd_opt *thd_opt);

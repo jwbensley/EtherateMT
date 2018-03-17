@@ -36,6 +36,7 @@
 #include <sys/ioctl.h>        // ioctl()
 #include <math.h>             // floor()
 #include <sys/mman.h>         // mmap()
+#include <linux/net_tstamp.h> // struct hwtstamp_config
 #include <poll.h>             // poll()
 #include <pthread.h>          // pthread_*()
 #include <sys/socket.h>       // socket()
@@ -43,15 +44,15 @@
 #include <stdlib.h>           // calloc(), exit(), EXIT_FAILURE, EXIT_SUCCESS, rand(), RAND_MAX, strtoul()
 #include <stdio.h>            // FILE, fclose(), fopen(), fscanf(), perror(), printf()
 #include <string.h>           // memcpy(), memset(), strncpy()
+#include <sys/syscall.h>      // SYS_gettid
 #include "sysexits.h"         // EX_NOPERM, EX_PROTOCOL, EX_SOFTWARE
-#include <linux/net_tstamp.h> // struct hwtstamp_config
 #include <unistd.h>           // getpagesize(), getpid(), getuid(), read(), sleep()
 #include <linux/version.h>    // KERNEL_VERSION(), LINUX_VERSION_CODE ///// Can we renmove this now?
 
 
 
 // Global constants:
-#define app_version "MT 0.5.beta 2018-02"
+#define app_version "MT 0.6.beta 2018-03"
 
 
 
@@ -60,8 +61,10 @@
 #define DEF_BLK_FRM_SZ 2096           // Default frame size in a block, data + TPACKET2_HDRLEN (52).
 #define DEF_BLK_SZ     getpagesize()  // Default block size
 #define DEF_BLK_NR     256            // Default number of blocks per ring
+#define DEF_ERR_LEN    128            // Default length of string from errno
 #define DEF_FRM_SZ_MAX 10000          // Max frame size with headers
 #define DEF_MSGVEC_LEN 256            // Default msgvec_vlen for sendmmsg()/recvmmsg()
+#define DEF_THD_NR     1              // Default number of worker threads
 
 // Flags for socket mode:
 #define SKT_RX    0                   // Run in Rx mode
@@ -70,18 +73,22 @@
 
 // Flags for socket type:
 #define SKT_PACKET        0           // Use read()/sendto()
-#define SKT_PACKET_MMAP   1           // Use PACKET_MMAP Tx/Rx rings
-#define SKT_SENDMSG       2           // Use sendmsg()
-#define SKT_SENDMMSG      3           // Use sendmmsg()
+#define SKT_PACKET_MMAP2  1           // Use PACKET_MMAP v2 Tx/Rx rings
+#define SKT_SENDMSG       2           // Use sendmsg()/recvmsg()
+#define SKT_SENDMMSG      3           // Use sendmmsg()/recvmmsg()
+#define SKT_PACKET_MMAP3  4           // Use PACKET_MMAP v3 Tx/Rx rings
 #define DEF_SKT_TYPE      SKT_PACKET  // Default mode
+
 
 
 // Application behaviour options:
 struct app_opt {
+    uint8_t  err_len;
+    char     *err_str;
     int32_t  fanout_grp;    
     uint8_t  sk_mode;
     uint8_t  sk_type;
-    uint16_t thd_cnt;
+    uint16_t thd_nr;
     uint8_t  thd_sk_affin; ///// Add CLI arg, try to avoid split NUMA node?
     uint8_t  verbose;
 };
@@ -110,6 +117,8 @@ struct thd_opt {
     uint32_t block_frm_sz;
     uint32_t block_nr;
     uint32_t block_sz;
+    uint8_t  err_len;
+    char     *err_str;
     uint32_t fanout_grp;
     uint32_t frame_nr;
     uint16_t frame_sz;
@@ -126,10 +135,14 @@ struct thd_opt {
     uint8_t  sk_type;
     int32_t  sock_fd;
     uint8_t  started;
-    uint16_t thd_cnt;
-    uint16_t thd_idx;
-    struct   tpacket_req3 tpacket_req3; // v3 for Rx ///// These need to be wrapped in a Kernel version check?
-    struct   tpacket_req  tpacket_req;  // v2 for Tx
+    uint8_t  stalling;   // Socket is returning ENOBUFS
+    uint16_t thd_nr; ///// Keep or remove?
+    uint16_t thd_id;
+    void     *tpacket_req3; // v3 for Rx ///// These need to be wrapped in a Kernel version check? Make them as pointers and move to local .c/.h files
+    uint8_t  tpacket_req3_sz;
+    void     *tpacket_req;  // v2 for Tx
+    uint8_t  tpacket_req_sz;
+    uint16_t ring_type;
     uint8_t  *tx_buffer;
     uint64_t tx_bytes;
     uint64_t tx_pkts;
@@ -141,12 +154,4 @@ struct etherate {
     struct   frm_opt frm_opt;
     struct   sk_opt sk_opt;
     struct   thd_opt *thd_opt;
-};
-
-
-///// RENAME, only needed for Rx
-struct block_desc {
-    uint32_t version;
-    uint32_t offset_to_priv;
-    struct   tpacket_hdr_v1 h1;
 };
