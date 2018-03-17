@@ -42,5 +42,5 @@
 
 
 
-// Configure a socket option "op" against thd_opt->sock_fd
+// Configure a socket option against thd_opt->sock_fd
 int32_t sock_op(uint8_t op, struct thd_opt *thd_opt);

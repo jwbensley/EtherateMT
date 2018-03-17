@@ -70,17 +70,25 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
             int32_t sock_wmem;
             int32_t sock_rmem;
 
-            if (thd_opt->sk_type == SKT_PACKET_MMAP) {
+            if (thd_opt->sk_type == SKT_PACKET_MMAP2) {
               sock_wmem = (thd_opt->block_sz * thd_opt->block_nr);
               sock_rmem = (thd_opt->block_sz * thd_opt->block_nr);
+
+            } else if (thd_opt->sk_type == SKT_PACKET_MMAP3) {
+              sock_wmem = (thd_opt->block_sz * thd_opt->block_nr);
+              sock_rmem = (thd_opt->block_sz * thd_opt->block_nr);
+
             } else if (thd_opt->sk_type == SKT_SENDMSG) {
               sock_wmem = (thd_opt->msgvec_vlen * thd_opt->frame_sz);
               sock_rmem = (thd_opt->msgvec_vlen * DEF_FRM_SZ_MAX); ///// align to recvmsg_rx
+
             } else if (thd_opt->sk_type == SKT_SENDMMSG) {
               sock_wmem = (thd_opt->msgvec_vlen * thd_opt->frame_sz);
               sock_rmem = (thd_opt->msgvec_vlen * DEF_FRM_SZ_MAX); ///// align to recvmsg_rx
+
             } else {
-              return -1; // Unsupported/undefined socket type
+              return -1; // Unsupported/undefined socket type //// CHANGE to DEF_SKT_TYPE???
+              
             }
 
             if (thd_opt->sk_mode == SKT_TX) {
@@ -98,10 +106,11 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                 if (sock_wmem_cur < sock_wmem) {
 
                     if (thd_opt->verbose)
-                        printf("Current socket write buffer size is %" PRIi32 " bytes, "
-                               "desired write buffer size is %" PRIi32 " bytes.\n"
-                               "Trying to increase to %" PRIi32 " bytes...\n",
-                               sock_wmem_cur, sock_wmem, sock_wmem);
+                        printf("%" PRIu32 ":Current socket write buffer size is %" PRIi32
+                               " bytes, desired write buffer size is %" PRIi32 " bytes.\n",
+                               thd_opt->thd_id, sock_wmem_cur, sock_wmem);
+                        printf("%" PRIu32 ":Trying to increase to %" PRIi32 " bytes...\n",
+                               thd_opt->thd_id, sock_wmem);
 
                     if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
                                    sizeof(sock_wmem)) < 0) {
@@ -118,15 +127,16 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                     }
 
 
-                    printf("Write buffer size set to %" PRIi32 " bytes\n", sock_wmem_cur);
+                    printf("%" PRIu32 ":Write buffer size set to %" PRIi32 " bytes\n",
+                           thd_opt->thd_id, sock_wmem_cur);
 
 
                     if (sock_wmem_cur < sock_wmem) {
 
                         if (thd_opt->verbose)
-                            printf("Write buffer still too small!\n"
-                                   "Trying to force to %" PRIi32 " bytes...\n",
-                                   sock_wmem);
+                            printf("%" PRIu32 ":Write buffer still too small!"
+                                   " Trying to force to %" PRIi32 " bytes...\n",
+                                   thd_opt->thd_id, sock_wmem);
                         
                         if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
                                        &sock_wmem, sizeof(sock_wmem)) < 0) {
@@ -145,10 +155,12 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                         // When the buffer size is forced the kernel sets a value double
                         // the requested size to allow for accounting/meta data space
                         if (thd_opt->verbose)
-                            printf("Forced write buffer size is now %" PRIi32 " bytes\n", (sock_wmem_cur/2));
+                            printf("%" PRIu32 ":Forced write buffer size is now %" PRIi32 " bytes\n",
+                                   thd_opt->thd_id, (sock_wmem_cur/2));
 
                         if (sock_wmem_cur < sock_wmem) {
-                            printf("Write buffer still smaller than desired!\n");
+                            printf("%" PRIu32 ":Write buffer still smaller than desired!\n",
+                                   thd_opt->thd_id);
                         }
 
                     }
@@ -174,10 +186,11 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                 if (sock_rmem_cur < sock_rmem) {
 
                     if (thd_opt->verbose)
-                        printf("Current socket read buffer size is %" PRIi32 " bytes, "
-                               "desired read buffer size is %" PRIi32 " bytes.\n"
-                               "Trying to increase to %" PRIi32 " bytes...\n",
-                               sock_rmem_cur, sock_rmem, sock_rmem);
+                        printf("%" PRIu32 ":Current socket read buffer size is %" PRIi32
+                               " bytes, desired read buffer size is %" PRIi32 " bytes.\n",
+                               thd_opt->thd_id, sock_rmem_cur, sock_rmem);
+                        printf("%" PRIu32 ":Trying to increase to %" PRIi32 " bytes...\n",
+                               thd_opt->thd_id, sock_rmem);
 
                     if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem,
                                    sizeof(sock_rmem)) < 0) {
@@ -194,15 +207,16 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                     }
 
 
-                    printf("Read buffer size set to %" PRIi32 " bytes\n", sock_rmem_cur);
+                    printf("%" PRIu32 ":Read buffer size set to %" PRIi32 " bytes\n",
+                           thd_opt->thd_id, sock_rmem_cur);
 
 
                     if (sock_rmem_cur < sock_rmem) {
 
                         if (thd_opt->verbose)
-                            printf("Read buffer still too small!\n"
-                                   "Trying to force to %" PRIi32 " bytes...\n",
-                                   sock_rmem);
+                            printf("%" PRIu32 ":Read buffer still too small!"
+                                   " Trying to force to %" PRIi32 " bytes...\n",
+                                   thd_opt->thd_id, sock_rmem);
                         
                         if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
                                        &sock_rmem, sizeof(sock_rmem))<0) {
@@ -221,10 +235,12 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                         // When the buffer size is forced the kernel sets a value double
                         // the requested size to allow for accounting/meta data space
                         if (thd_opt->verbose)
-                            printf("Forced read buffer size is now %" PRIi32 " bytes\n", (sock_rmem_cur/2));
+                            printf("%" PRIu32 ":Forced read buffer size is now %" PRIi32 " bytes\n",
+                                   thd_opt->thd_id, (sock_rmem_cur/2));
 
                         if (sock_rmem_cur < sock_rmem) {
-                            printf("Read buffer Still smaller than desired!\n");
+                            printf("%" PRIu32 ":Read buffer Still smaller than desired!\n",
+                                   thd_opt->thd_id);
                         }
 
 
@@ -250,7 +266,7 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
         case S_O_VER_TP2:
 
             ;
-            static const int32_t sock_ver2 = TPACKET_V2;
+            static const int32_t sock_ver2 = TPACKET_V2; ///// This wont exist!
             return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_VERSION, &sock_ver2, sizeof(sock_ver2));
 
     
@@ -259,7 +275,7 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
         case S_O_VER_TP3:
 
             ;
-            static const int32_t sock_ver3 = TPACKET_V3;
+            static const int32_t sock_ver3 = TPACKET_V3; ///// This wont exist!
             return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_VERSION, &sock_ver3, sizeof(sock_ver3));
 
 
@@ -321,31 +337,15 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
             
 
         // Define a TPACKET v2 Tx/Rx ring buffer
-        case S_O_RING_TP2:
+        case S_O_RING_TP2: ///// Need to break out Tx and Rx ring types
 
-            memset(&thd_opt->tpacket_req,  0, sizeof(struct tpacket_req));
-        
-            thd_opt->tpacket_req.tp_block_size = thd_opt->block_sz;
-            thd_opt->tpacket_req.tp_frame_size = thd_opt->block_frm_sz; // tp_frame_size = TPACKET2_HDRLEN + frame_sz
-            thd_opt->tpacket_req.tp_block_nr   = thd_opt->block_nr;
-            thd_opt->tpacket_req.tp_frame_nr   = thd_opt->frame_nr;
-
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_TX_RING, (void*)&thd_opt->tpacket_req, sizeof(struct tpacket_req));
+            return setsockopt(thd_opt->sock_fd, SOL_PACKET, thd_opt->ring_type, thd_opt->tpacket_req, thd_opt->tpacket_req_sz); ////// Will PACKET_TX/RX_RING exist?
 
 
         // Define a TPACKET v3 Tx/Rx ring buffer
-        case S_O_RING_TP3:
+        case S_O_RING_TP3: ///// Need to break out Tx and Rx ring types
 
-            memset(&thd_opt->tpacket_req3, 0, sizeof(struct tpacket_req3));
-
-            thd_opt->tpacket_req3.tp_block_size = thd_opt->block_sz;
-            thd_opt->tpacket_req3.tp_frame_size = thd_opt->block_frm_sz;
-            thd_opt->tpacket_req3.tp_block_nr   = thd_opt->block_nr;
-            thd_opt->tpacket_req3.tp_frame_nr   = thd_opt->frame_nr; ///// (thd_opt->block_sz * thd_opt->block_nr) / thd_opt->block_frm_sz;
-            thd_opt->tpacket_req3.tp_retire_blk_tov   = 1; ////// Timeout in msec, what does this do?
-            thd_opt->tpacket_req3.tp_feature_req_word = 0; //TP_FT_REQ_FILL_RXHASH;  ///// What does this do?
-
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_RX_RING, (void*)&thd_opt->tpacket_req3, sizeof(thd_opt->tpacket_req3));
+            return setsockopt(thd_opt->sock_fd, SOL_PACKET, thd_opt->ring_type, thd_opt->tpacket_req3, thd_opt->tpacket_req3_sz); ////// Will PACKET_TX/RX_RING exist?
 
 
         // mmap() the Tx/Rx ring buffer against the socket, for TPACKET_V2/3

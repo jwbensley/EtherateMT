@@ -25,14 +25,20 @@
 
 
 
-// Worker thread entry function
-void *mmsg_init(void* thd_opt_p);
+void *tpacket_v2_init(void* thd_opt_p) {
 
-// Rx thread loop using recvmmsg()
-void mmsg_rx(struct thd_opt *thd_opt);
+    uint32_t version     = (LINUX_VERSION_CODE >> 16);
+    uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
+    uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t mmsg_sock(struct thd_opt *thd_opt);
+    printf("Kernel version detected as %u.%u.%u, TPACKET_V2 not supported.\n", version, patch_level, sub_level);
 
-// Tx thread loop using sendmmsg()
-void mmsg_tx(struct thd_opt *thd_opt);
+    return NULL;
+    
+}
+
+
+
+void tpacket_v2_stats(struct thd_opt *thd_opt, uint64_t *rx_drops) {
+    return;
+}

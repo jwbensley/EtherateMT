@@ -25,14 +25,7 @@
 
 
 
-// Worker thread entry function
-void *mmsg_init(void* thd_opt_p);
+// Fake function calls
+void *tpacket_v3_init(void* thd_opt_p);
 
-// Rx thread loop using recvmmsg()
-void mmsg_rx(struct thd_opt *thd_opt);
-
-// Return socket FD for a non Tx/Rx ring socket
-int32_t mmsg_sock(struct thd_opt *thd_opt);
-
-// Tx thread loop using sendmmsg()
-void mmsg_tx(struct thd_opt *thd_opt);
+void tpacket_v3_stats(struct thd_opt *thd_opt, uint64_t *rx_drops, uint64_t *rx_qfrx);

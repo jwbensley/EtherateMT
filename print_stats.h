@@ -25,14 +25,5 @@
 
 
 
-// Worker thread entry function
-void *mmsg_init(void* thd_opt_p);
-
-// Rx thread loop using recvmmsg()
-void mmsg_rx(struct thd_opt *thd_opt);
-
-// Return socket FD for a non Tx/Rx ring socket
-int32_t mmsg_sock(struct thd_opt *thd_opt);
-
-// Tx thread loop using sendmmsg()
-void mmsg_tx(struct thd_opt *thd_opt);
+// Aggregate per-thread stats and print every second
+void *print_pps(void *etherate_p);

@@ -39,8 +39,8 @@ void get_if_list();
 // Copy interface name from interface index number into char*
 void get_if_name_by_index(int32_t if_index, uint8_t* if_name);
 
-// Total and print traffic stats every second
-void *print_pps(void *etherate_p);
-
 // Print CLI usage/args
 void print_usage ();
+
+// Print a custom message with the errno text and thread ID of the calling thread
+void tperror(struct thd_opt *thd_opt, char *msg);
