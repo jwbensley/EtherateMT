@@ -25,10 +25,13 @@
 
 
 // Process CLI args
-uint8_t cli_args(int argc, char *argv[], struct etherate *etherate);
+uint8_t cli_args(int argc, char *argv[], struct etherate *eth);
+
+// Cleanup main etherate struct
+void etherate_cleanup(struct etherate *eth);
 
 // Populate settings with default values
-void etherate_setup(struct etherate *etherate);
+void etherate_setup(struct etherate *eth);
 
 // Return interface index from name
 int32_t get_if_index_by_name(uint8_t if_name[IF_NAMESIZE]);
@@ -40,7 +43,22 @@ void get_if_list();
 void get_if_name_by_index(int32_t if_index, uint8_t* if_name);
 
 // Print CLI usage/args
-void print_usage ();
+void print_usage();
+
+// Remove the interface from promiscuous mode
+int16_t rem_int_promisc(struct etherate *eth);
+
+// Set the interface an interface in promiscuous mode
+int16_t set_int_promisc(struct etherate *eth);
+
+// Signal handler to clean up threads
+void signal_handler(int signal);
+
+// Worker thread cleanup
+void thread_cleanup(void *thd_opt_p);
+
+// Set the default settings for a worker thread
+void thread_init(struct etherate *eth, uint16_t thread);
 
 // Print a custom message with the errno text and thread ID of the calling thread
-void tperror(struct thd_opt *thd_opt, char *msg);
+void tperror(struct thd_opt *thd_opt, const char *msg);

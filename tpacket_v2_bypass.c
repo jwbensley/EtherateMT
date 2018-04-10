@@ -25,13 +25,13 @@
 
 
 
-void *tpacket_v2_init(void* thd_opt_p) {
+void *tpacket_v2_init() {
 
     uint32_t version     = (LINUX_VERSION_CODE >> 16);
     uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
     uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
 
-    printf("Kernel version detected as %u.%u.%u, TPACKET_V2 not supported.\n", version, patch_level, sub_level);
+    printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ", TPACKET_V2 not supported.\n", version, patch_level, sub_level);
 
     return NULL;
     
@@ -39,6 +39,6 @@ void *tpacket_v2_init(void* thd_opt_p) {
 
 
 
-void tpacket_v2_stats(struct thd_opt *thd_opt, uint64_t *rx_drops) {
+void tpacket_v2_stats() {
     return;
 }

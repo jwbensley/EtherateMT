@@ -1,3 +1,19 @@
+-----EtherateMT 0.7 Beta 2018-04
+
+[FEATURE] Added enhancement #33; Implement additional compiler checkes
+
+[MINOR] Fixed issue #32; Valgrind memory leak when invalid CLI arg
+
+[MAJOR] Fixed issue #27; PACKET_MMAP V2, the PACKET_RX_RING is broken
+
+[MINOR] Fixed issue #22; Update documentation for MTU size `-f` option
+
+[MINOR] Fixed issue #19; `PACKET_MMAP` is experiencing a Tx buffer overflow
+
+[MINOR] Fixed issue #17; Close sockets and remove int promisc mode
+
+
+
 -----EtherateMT 0.6 Beta 2018-03
 
 [MINOR] Fixed issue #29; Added check for fclose return value

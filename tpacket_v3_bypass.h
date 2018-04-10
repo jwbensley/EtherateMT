@@ -26,6 +26,6 @@
 
 
 // Fake function calls
-void *tpacket_v3_init(void* thd_opt_p);
+void *tpacket_v3_init();
 
-void tpacket_v3_stats(struct thd_opt *thd_opt, uint64_t *rx_drops, uint64_t *rx_qfrx);
+void tpacket_v3_stats();
