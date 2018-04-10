@@ -29,7 +29,7 @@
 
 
 
-uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
+uint8_t cli_args(int argc, char *argv[], struct etherate *eth) {
 
     if (argc > 1) {
 
@@ -40,7 +40,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             if (strncmp(argv[i], "-a", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->frm_opt.block_frm_sz = (uint16_t)strtoul(argv[i+1], NULL, 0);
+                    eth->frm_opt.block_frm_sz = (uint16_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing frame allocation size.\n"
@@ -53,7 +53,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             } else if (strncmp(argv[i], "-b", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->frm_opt.block_sz = (uint16_t)strtoul(argv[i+1], NULL, 0);
+                    eth->frm_opt.block_sz = (uint16_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing ring buffer block size.\n"
@@ -66,7 +66,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             } else if (strncmp(argv[i], "-B", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->frm_opt.block_nr = (uint16_t)strtoul(argv[i+1], NULL, 0);
+                    eth->frm_opt.block_nr = (uint16_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing ring buffer block count.\n"
@@ -79,7 +79,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             } else if (strncmp(argv[i], "-c", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->app_opt.thd_nr = (uint32_t)strtoul(argv[i+1], NULL, 0);
+                    eth->app_opt.thd_nr = (uint32_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing number of threads.\n"
@@ -99,15 +99,15 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                     }
 
                     int16_t file_ret = 0;
-                    etherate->frm_opt.frame_sz = 0;
+                    eth->frm_opt.frame_sz = 0;
                     while (file_ret != EOF &&
-                          (etherate->frm_opt.frame_sz < DEF_FRM_SZ_MAX)) {
+                          (eth->frm_opt.frame_sz < DEF_FRM_SZ_MAX)) {
 
-                        file_ret = fscanf(frame_file, "%" SCNx8, etherate->frm_opt.tx_buffer + etherate->frm_opt.frame_sz);
+                        file_ret = fscanf(frame_file, "%" SCNx8, eth->frm_opt.tx_buffer + eth->frm_opt.frame_sz);
 
                         if (file_ret == EOF) break;
 
-                        etherate->frm_opt.frame_sz += 1;
+                        eth->frm_opt.frame_sz += 1;
                     }
 
                     if (fclose(frame_file) != 0) {
@@ -115,19 +115,19 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
                         return EXIT_FAILURE;
                     }
 
-                    printf("Using custom frame (%" PRIu16 " octets loaded):\n", etherate->frm_opt.frame_sz);
+                    printf("Using custom frame (%" PRIu16 " octets loaded):\n", eth->frm_opt.frame_sz);
 
-                    for (int i = 0; i <= etherate->frm_opt.frame_sz; i += 1) {
-                        printf ("0x%" PRIx8 " ", etherate->frm_opt.tx_buffer[i]);
+                    for (uint16_t j = 0; j <= eth->frm_opt.frame_sz; j += 1) {
+                        printf ("0x%" PRIx8 " ", eth->frm_opt.tx_buffer[j]);
                     }
                     printf("\n");
 
-                    etherate->frm_opt.custom_frame = 1;
+                    eth->frm_opt.custom_frame = 1;
 
-                    if (etherate->frm_opt.frame_sz > 1514) {
+                    if (eth->frm_opt.frame_sz > 1514) {
                         printf("WARNING: Make sure your device supports baby "
                                "giants or jumbo frames as required.\n");
-                    } else if (etherate->frm_opt.frame_sz < 46) {
+                    } else if (eth->frm_opt.frame_sz < 46) {
                         printf("WARNING: Minimum ethernet payload is 46 bytes, "
                                "Linux may pad the frame out to 46 bytes.\n");
                     }
@@ -146,18 +146,18 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
                 if (argc > (i+1)) {
 
-                    etherate->frm_opt.frame_sz = (uint32_t)strtoul(argv[i+1], NULL, 0);
+                    eth->frm_opt.frame_sz = (uint32_t)strtoul(argv[i+1], NULL, 0);
 
-                    if (etherate->frm_opt.frame_sz > DEF_FRM_SZ_MAX) {
+                    if (eth->frm_opt.frame_sz > DEF_FRM_SZ_MAX) {
                         printf("Oops! The frame size is larger than the EtherateMT buffer size"
-                               " (%" PRIi32 " bytes).\n", DEF_FRM_SZ_MAX);
+                               " (%" PRId32 " bytes).\n", DEF_FRM_SZ_MAX);
                         return EX_SOFTWARE;
                     }
 
-                    if (etherate->frm_opt.frame_sz > 1514) {
+                    if (eth->frm_opt.frame_sz > 1514) {
                         printf("WARNING: Make sure your device supports baby "
                                "giants or jumbo frames as required.\n");
-                    } else if (etherate->frm_opt.frame_sz < 46) {
+                    } else if (eth->frm_opt.frame_sz < 46) {
                         printf("WARNING: Minimum ethernet payload is 46 bytes, "
                                "Linux may pad the frame out to 46 bytes.\n");
                     }
@@ -184,15 +184,15 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
                 if (argc > (i+1)) {
 
-                    strncpy((char*)etherate->sk_opt.if_name, argv[i+1], IF_NAMESIZE);
-                    etherate->sk_opt.if_index = get_if_index_by_name(etherate->sk_opt.if_name);
+                    strncpy((char*)eth->sk_opt.if_name, argv[i+1], IF_NAMESIZE);
+                    eth->sk_opt.if_index = get_if_index_by_name(eth->sk_opt.if_name);
                     
-                    if (etherate->sk_opt.if_index == -1) {
-                        printf("Opps! Couldn't find interface with name: %s.\n", argv[i+1]);
+                    if (eth->sk_opt.if_index == -1) {
+                        printf("Opps! Can't find interface with name: %s.\n", argv[i+1]);
                         return EXIT_FAILURE;
                     }
                     
-                    printf("Using inteface %s (%" PRIi32 ").\n", etherate->sk_opt.if_name, etherate->sk_opt.if_index);
+                    printf("Using inteface %s (%" PRId32 ").\n", eth->sk_opt.if_name, eth->sk_opt.if_index);
                     i += 1;
 
                 } else {
@@ -207,15 +207,15 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
                 if (argc > (i+1)) {
 
-                    etherate->sk_opt.if_index = (uint32_t)strtoul(argv[i+1], NULL, 0);
-                    get_if_name_by_index(etherate->sk_opt.if_index, etherate->sk_opt.if_name);
+                    eth->sk_opt.if_index = (uint32_t)strtoul(argv[i+1], NULL, 0);
+                    get_if_name_by_index(eth->sk_opt.if_index, eth->sk_opt.if_name);
 
-                    if (etherate->sk_opt.if_name[0] == 0) {
-                        printf("Opps! Couldn't find interface with index: %" PRIu32 ".\n", (uint32_t)strtoul(argv[i+1], NULL, 0));
+                    if (eth->sk_opt.if_name[0] == 0) {
+                        printf("Opps! Can't find interface with index: %" PRIu32 ".\n", (uint32_t)strtoul(argv[i+1], NULL, 0));
                         return(EXIT_FAILURE);
                     }
                     
-                    printf("Using inteface %s (%" PRIi32 ").\n", etherate->sk_opt.if_name, etherate->sk_opt.if_index);
+                    printf("Using inteface %s (%" PRId32 ").\n", eth->sk_opt.if_name, eth->sk_opt.if_index);
                     i += 1;
 
                 } else {
@@ -235,7 +235,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             } else if (strncmp(argv[i], "-m", 2) == 0) {
 
                 if (argc > (i+1)) {
-                    etherate->sk_opt.msgvec_vlen = (uint16_t)strtoul(argv[i+1], NULL, 0);
+                    eth->sk_opt.msgvec_vlen = (uint16_t)strtoul(argv[i+1], NULL, 0);
                     i += 1;
                 } else {
                     printf("Oops! Missing batch packet count.\n"
@@ -247,43 +247,43 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
             // Use PACKET_MMAP with sendto()/poll() syscalls
             } else if (strncmp(argv[i], "-p1", 3) == 0) {
 
-                etherate->app_opt.sk_type = SKT_PACKET_MMAP2;
+                eth->app_opt.sk_type = SKT_PACKET_MMAP2;
 
 
             // Use sendmsg()/recvmsg() syscalls
             } else if (strncmp(argv[i], "-p2", 3) == 0) {
 
-                etherate->app_opt.sk_type = SKT_SENDMSG;
+                eth->app_opt.sk_type = SKT_SENDMSG;
 
 
             // Use sendmmsg()/recvmmsg() syscalls
             } else if (strncmp(argv[i], "-p3", 3) == 0) {
 
-                etherate->app_opt.sk_type = SKT_SENDMMSG;
+                eth->app_opt.sk_type = SKT_SENDMMSG;
 
 
             // Use PACKET_MMAP with sendto()poll() syscalls
             } else if (strncmp(argv[i], "-p4", 3) == 0) {
 
-                etherate->app_opt.sk_type = SKT_PACKET_MMAP3;
+                eth->app_opt.sk_type = SKT_PACKET_MMAP3;
 
 
             // Run in receive mode
             } else if (strncmp(argv[i], "-r" ,2) == 0)  {
 
-                etherate->app_opt.sk_mode = SKT_RX;
+                eth->app_opt.sk_mode = SKT_RX;
 
 
             // Run in bidirectional mode
             } else if (strncmp(argv[i], "-rt", 3) == 0) {
 
-                etherate->app_opt.sk_mode = SKT_BIDI;
+                eth->app_opt.sk_mode = SKT_BIDI;
 
 
             // Enable verbose output
             } else if (strncmp(argv[i], "-v" ,2) == 0)  {
 
-                etherate->app_opt.verbose = 1;
+                eth->app_opt.verbose = 1;
 
 
             // Display version
@@ -311,30 +311,58 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *etherate) {
 
 
 
-void etherate_setup(struct etherate *etherate) {
+void etherate_cleanup(struct etherate *eth) {
+
+    if (eth->app_opt.thd != NULL)
+        free(eth->app_opt.thd);
+    
+    if (eth->app_opt.thd_attr != NULL)
+        free(eth->app_opt.thd_attr);
+
+    if (eth->frm_opt.tx_buffer != NULL)
+        free(eth->frm_opt.tx_buffer);
+
+    if (eth->thd_opt != NULL)
+        free(eth->thd_opt);
+
+    rem_int_promisc(eth);
+
+}
+
+
+
+void etherate_setup(struct etherate *eth) {
 
     // All fanout worker threads will belong to the same fanout group
-    etherate->app_opt.err_len        = DEF_ERR_LEN;
-    etherate->app_opt.err_str        = NULL;
-    etherate->app_opt.fanout_grp     = getpid() & 0xffff;
-    etherate->app_opt.sk_mode        = SKT_TX;
-    etherate->app_opt.sk_type        = DEF_SKT_TYPE;
-    etherate->app_opt.thd_nr         = DEF_THD_NR;
-    etherate->app_opt.thd_sk_affin   = 0;
-    etherate->app_opt.verbose        = 0;
+    eth->app_opt.err_len        = DEF_ERR_LEN;
+    eth->app_opt.err_str        = NULL;
+    eth->app_opt.fanout_grp     = getpid() & 0xffff;
+    eth->app_opt.sk_mode        = SKT_TX;
+    eth->app_opt.sk_type        = DEF_SKT_TYPE;
+    eth->app_opt.thd            = NULL;
+    eth->app_opt.thd_affin      = 0;
+    eth->app_opt.thd_attr       = NULL;
+    eth->app_opt.thd_nr         = DEF_THD_NR;
+    eth->app_opt.verbose        = 0;
     
-    etherate->frm_opt.block_frm_sz   = DEF_BLK_FRM_SZ;
-    etherate->frm_opt.block_nr       = DEF_BLK_NR;
-    etherate->frm_opt.block_sz       = DEF_BLK_SZ;
-    etherate->frm_opt.custom_frame   = 0;
-    etherate->frm_opt.frame_nr       = 0;
-    etherate->frm_opt.frame_sz       = DEF_FRM_SZ;
-    // Used to load a custom frame payload from file:
-    etherate->frm_opt.tx_buffer      = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
+    eth->frm_opt.block_frm_sz   = DEF_BLK_FRM_SZ;
+    eth->frm_opt.block_nr       = DEF_BLK_NR;
+    eth->frm_opt.block_sz       = DEF_BLK_SZ;
+    eth->frm_opt.custom_frame   = 0;
+    eth->frm_opt.frame_nr       = 0;
+    eth->frm_opt.frame_sz       = DEF_FRM_SZ;
+    eth->frm_opt.tx_buffer      = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
+
+    if (eth->frm_opt.tx_buffer == NULL) {
+        printf("Failed to calloc() per-thread buffers!\n");
+        exit(EXIT_FAILURE);
+    }
     
-    etherate->sk_opt.if_index         = -1;
-    memset(&etherate->sk_opt.if_name, 0, IF_NAMESIZE);
-    etherate->sk_opt.msgvec_vlen      = DEF_MSGVEC_LEN;
+    eth->sk_opt.if_index        = -1;
+    memset(&eth->sk_opt.if_name, 0, IF_NAMESIZE);
+    eth->sk_opt.msgvec_vlen     = DEF_MSGVEC_LEN;
+
+    eth->thd_opt                = NULL;
 
 }
 
@@ -342,29 +370,28 @@ void etherate_setup(struct etherate *etherate) {
 
 int32_t get_if_index_by_name(uint8_t if_name[IF_NAMESIZE]) {
 
-    #define ret -1;
-
-    int32_t sock_fd;
+    int32_t sock;
     struct ifreq ifr;
 
     memset(&ifr, 0, sizeof(ifr));
     strncpy(ifr.ifr_name, (char*)if_name, IF_NAMESIZE);
-    sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-    if (ioctl(sock_fd, SIOCGIFINDEX, &ifr)==0)
+    if (ioctl(sock, SIOCGIFINDEX, &ifr)==0)
     {
-        if (close(sock_fd) == -1) {
-            perror("Couldn't close socket");
+        if (close(sock) == -1) {
+            perror("Can't close socket");
             exit(EX_PROTOCOL);
         }
         return ifr.ifr_ifindex;
     }
 
-    if (close(sock_fd) == -1) {
-        perror("Couldn't close socket");
+    if (close(sock) == -1) {
+        perror("Can't close socket");
         exit(EX_PROTOCOL);
     }
-    return ret;
+
+    return -1;
 
 }
 
@@ -372,14 +399,14 @@ int32_t get_if_index_by_name(uint8_t if_name[IF_NAMESIZE]) {
 
 void get_if_list() {
 
-    struct ifreq ifreq;
+    struct ifreq ifr;
     struct ifaddrs *ifaddr, *ifa;
 
-    int sock_fd;
-    sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    int sock;
+    sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
     if (getifaddrs(&ifaddr) == -1) {
-        perror("Couldn't get interface list");
+        perror("Can't get interface list");
         exit(EX_PROTOCOL);
     }
 
@@ -395,32 +422,47 @@ void get_if_list() {
         if (ifa->ifa_addr->sa_family==AF_PACKET) {
 
             // Set the ifreq by interface name
-            strncpy(ifreq.ifr_name,ifa->ifa_name,sizeof(ifreq.ifr_name));
+            strncpy(ifr.ifr_name,ifa->ifa_name,sizeof(ifr.ifr_name));
 
             // Does this device have a hardware address?
-            if (ioctl (sock_fd, SIOCGIFHWADDR, &ifreq) == 0) {
+            if (ioctl (sock, SIOCGIFHWADDR, &ifr) == 0) {
 
                 uint8_t mac[6];
-                memcpy(mac, ifreq.ifr_addr.sa_data, 6);
+                memcpy(mac, ifr.ifr_addr.sa_data, 6);
+
+                // Get the interface txqueuelen
+                if (ioctl(sock, SIOCGIFTXQLEN, &ifr) == -1) {
+
+                    perror("Can't get the interface txqueuelen");
+                    if (close(sock) == -1) {
+                        perror("Can't close socket");
+                    }
+                    exit(EX_PROTOCOL);
+
+                }
+
+                uint32_t txqueuelen = ifr.ifr_qlen;
 
                 // Get the interface index
-                if (ioctl(sock_fd, SIOCGIFINDEX, &ifreq) == -1) {
+                if (ioctl(sock, SIOCGIFINDEX, &ifr) == -1) {
 
-                    perror("Couldn't get the interface index");
-                    if (close(sock_fd) == -1) {
-                        perror("Couldn't close socket");
+                    perror("Can't get the interface index");
+                    if (close(sock) == -1) {
+                        perror("Can't close socket");
                     }
                     exit(EX_PROTOCOL);
 
                 }
 
                 // Print each interface's details
-                printf("Device %s with address "
-                       "%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ","
-                       " has interface index %" PRIi32 "\n",
-                       ifreq.ifr_name,
+                printf("Device %s,"
+                       " address %02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ":%02" PRIx8 ","
+                       " txqueuelen %" PRIu32 ","
+                       " interface index %" PRId32 "\n",
+                       ifr.ifr_name,
                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-                       ifreq.ifr_ifindex);
+                       txqueuelen,
+                       ifr.ifr_ifindex);
 
             } 
 
@@ -429,7 +471,7 @@ void get_if_list() {
     }
 
     freeifaddrs(ifaddr);
-    close(sock_fd);
+    close(sock);
 
     return;
 
@@ -437,27 +479,31 @@ void get_if_list() {
 
 
 
-void get_if_name_by_index(int32_t if_index, uint8_t* if_name) {
+void get_if_name_by_index(int32_t if_index, uint8_t* if_name) { //// Why no return value on this function?
 
-    int32_t sock_fd;
+    int32_t sock;
     struct ifreq ifr;
 
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_ifindex = if_index;
-    sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-    if (ioctl(sock_fd, SIOCGIFNAME, &ifr)==0)
-    {
+    if (ioctl(sock, SIOCGIFNAME, &ifr)==0) {
+
         strncpy((char*)if_name, ifr.ifr_name, IF_NAMESIZE);
-        if (close(sock_fd) == -1) {
-            perror("Couldn't close socket");
+        if (close(sock) == -1) {
+            perror("Can't close socket");
         }
+
         return;
+
     } else {
+        
         memset(if_name, 0, IF_NAMESIZE);
-        if (close(sock_fd) == -1) {
-            perror("Couldn't close socket");
+        if (close(sock) == -1) {
+            perror("Can't close socket");
         }
+        
         return;
     }
 
@@ -469,22 +515,22 @@ void print_usage () {
 
     printf ("Usage info;\n"
             "\t-a\tAllocation size in bytes for each frame per block (for PACKET_MMAP).\n"
-            "\t\tThis includes meta data. Default is %" PRIu32 " bytes.\n"
-            "\t-b\tBlock size in ring buffer (for PACKET_MMAP). Default is %" PRIu32 " bytes.\n"
-            "\t-B\tNumber of blocks in ring buffer (for PACKET_MMAP). Default is %" PRIu32 ".\n"
+            "\t\tThis includes meta data. Default is %" PRId32 " bytes.\n"
+            "\t-b\tBlock size in ring buffer (for PACKET_MMAP). Default is %" PRId32 " bytes.\n"
+            "\t-B\tNumber of blocks in ring buffer (for PACKET_MMAP). Default is %" PRId32 ".\n"
             "\t-c\tNumber of worker threads to start. One more thread is started in addition\n"
-            "\t\tto this value to print stats. Default is %" PRIu32".\n"
+            "\t\tto this value to print stats. Default is %" PRId32".\n"
             "\t-C\tLoad a custom frame from file formatted as hex bytes.\n"
             "\t\tDefault (when not using -C) the frame is random data.\n"
-            "\t-f\tFrame size in bytes (headers+payload excluding CRC).\n"
+            "\t-f\tFrame size in bytes (excluding Preamble/SFD/CRC/IFG).\n"
             "\t\tThis has no effect when used with -C.\n"
-            "\t\tDefault is %" PRIu16 ", max %" PRIu16 ".\n"
+            "\t\tDefault is %" PRId16 ", max %" PRId16 ".\n"
             "\t-i\tSet interface by name.\n"
             "\t-I\tSet interface by index.\n"
             "\t-l\tList available interfaces.\n"
             "\t-m\tSet the number of packets to batch process with sendmmsg()/recvmmsg().\n"
-            "\t\tDefault is %" PRIu16 ".\n"
-            "\t-p[1-4]\tThe default send/receive mode processes a single packet per send()/read() syscall.\n" ///// Document this
+            "\t\tDefault is %" PRId16 ".\n"
+            "\t-p[1-4]\tThe default send/receive mode processes a single packet per send()/read() syscall.\n"
             "\t-p1\tSwith to PACKET_MMAP mode using PACKET_TX/RX_RING v2 to batch process a ring of packets.\n"
             "\t-p2\tSwitch to sendmsg()/recvmsg() syscalls per packet.\n"
             "\t-p3\tSwitch to sendmmsg()/recvmmsg() syscalls to batch process packets.\n"
@@ -493,6 +539,8 @@ void print_usage () {
             "\t-r\tRun the worker threads in receive (Rx) mode.\n"
             "\t-rt\tRun the worker threads in bidirectional (BiDi) mode.\n"
             "\t\tHalf the worker threads run in Rx mode, half run in Tx mode.\n"
+            "\t-t\tPin the worker threads to sequential cores and set the\n"
+            "\t\thighest scheduling priority.\n"
             "\t-v\tEnable verbose output.\n"
             "\t-V|--version Display version\n"
             "\t-h|--help Display this help text\n",
@@ -503,41 +551,198 @@ void print_usage () {
 
 
 
-void thread_init(struct etherate *etherate, uint16_t thread) {
+int16_t rem_int_promisc(struct etherate *eth) {
 
-    etherate->thd_opt[thread].block_frm_sz    = etherate->frm_opt.block_frm_sz;
-    etherate->thd_opt[thread].block_nr        = etherate->frm_opt.block_nr;
-    etherate->thd_opt[thread].block_sz        = etherate->frm_opt.block_sz;
-    etherate->thd_opt[thread].err_len         = etherate->app_opt.err_len;
-    etherate->thd_opt[thread].err_str         = (char*)calloc(etherate->app_opt.err_len, 1);
-    etherate->thd_opt[thread].fanout_grp      = etherate->app_opt.fanout_grp;
-    etherate->thd_opt[thread].frame_nr        = etherate->frm_opt.frame_nr;
-    etherate->thd_opt[thread].frame_sz        = etherate->frm_opt.frame_sz;
-    etherate->thd_opt[thread].frm_sz_max      = DEF_FRM_SZ_MAX;
-    etherate->thd_opt[thread].if_index        = etherate->sk_opt.if_index;
-    strncpy((char*)etherate->thd_opt[thread].if_name, (char*)etherate->sk_opt.if_name, IF_NAMESIZE);
-    etherate->thd_opt[thread].mmap_buf        = NULL;
-    etherate->thd_opt[thread].msgvec_vlen     = etherate->sk_opt.msgvec_vlen;
-    etherate->thd_opt[thread].rd              = NULL;
-    etherate->thd_opt[thread].rx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
-    etherate->thd_opt[thread].rx_bytes        = 0;
-    etherate->thd_opt[thread].rx_pkts         = 0;
-    etherate->thd_opt[thread].started         = 0;
-    etherate->thd_opt[thread].sk_mode         = etherate->app_opt.sk_mode;
-    etherate->thd_opt[thread].sk_type         = etherate->app_opt.sk_type;
-    etherate->thd_opt[thread].thd_nr          = etherate->app_opt.thd_nr;
-    etherate->thd_opt[thread].thd_id          = 0; ///// Keep or remove?
-    etherate->thd_opt[thread].tx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
-    memcpy(etherate->thd_opt[thread].tx_buffer, etherate->frm_opt.tx_buffer, DEF_FRM_SZ_MAX);
-    etherate->thd_opt[thread].tx_bytes        = 0;
-    etherate->thd_opt[thread].tx_pkts         = 0;
-    etherate->thd_opt[thread].verbose         = etherate->app_opt.verbose;
+    printf("Removing interface promiscuous mode\n");
+
+    strncpy(eth->ifr.ifr_name, (char*)eth->sk_opt.if_name, IFNAMSIZ);
+
+
+    int32_t sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (sock == -1){
+        perror("Can't open socket for promiscuous mode");
+        return EX_SOFTWARE;
+    }
+
+
+    if (ioctl(sock, SIOCGIFFLAGS, &eth->ifr) == -1) {
+        perror("Getting socket flags when removing promiscuous mode failed");
+        if (close(sock) != 0)
+            perror("Can't close socket for promiscuous mode");
+        return EX_SOFTWARE;
+    }
+
+    eth->ifr.ifr_flags &= ~IFF_PROMISC;
+
+    if (ioctl(sock, SIOCSIFFLAGS, &eth->ifr) == -1) {
+        perror("Setting socket flags when removing promiscuous mode failed");
+        if (close(sock) != 0)
+            perror("Can't close socket for promiscuous mode");
+        return EX_SOFTWARE;
+    }
+
+
+    if (close(sock) != 0)
+        perror("Can't close socket for promiscuous mode");
+
+
+    return EXIT_SUCCESS;
 
 }
 
 
 
-void tperror(struct thd_opt *thd_opt, char *msg) {
+int16_t set_int_promisc(struct etherate *eth) {
+
+    printf("Setting interface promiscuous mode\n");
+    strncpy(eth->ifr.ifr_name, (char*)eth->sk_opt.if_name, IFNAMSIZ);
+
+    int32_t sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (sock == -1){
+        perror("Can't open socket for promiscuous mode");
+        return EX_SOFTWARE;
+    }
+
+    if (ioctl(sock, SIOCGIFFLAGS, &eth->ifr) == -1) {
+        perror("Getting socket flags failed when setting promiscuous mode");
+        if (close(sock) != 0)
+            perror("Can't close socket for promiscuous mode");
+        return EX_SOFTWARE;
+    }
+
+    eth->ifr.ifr_flags |= IFF_PROMISC;
+
+    if (ioctl(sock, SIOCSIFFLAGS, &eth->ifr) == -1){
+        perror("Setting socket flags failed when setting promiscuous mode");
+        if (close(sock) != 0)
+            perror("Can't close socket for promiscuous mode");
+        return EX_SOFTWARE;
+    }
+
+
+    if (close(sock) != 0)
+        perror("Can't close socket for promiscuous mode");
+
+
+    return EXIT_SUCCESS;
+
+}
+
+
+
+void signal_handler(int signal) {
+
+    struct etherate *eth = eth_p;
+
+    printf("Quitting...\n");
+
+
+    // Cancel worker threads and join them
+    for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread += 1) {
+
+        int32_t pcancel = pthread_cancel(eth->app_opt.thd[thread]);
+        if (pcancel != 0)
+            printf("Can't cancel worker thread %" PRIu32 ", returned %" PRId32 "\n", eth->thd_opt[thread].thd_id, pcancel);
+
+        void *thd_ret = NULL;
+        pthread_join(eth->app_opt.thd[thread], &thd_ret);
+
+    }
+
+
+    // Cancel the stats thread and join it
+    int32_t pcancel = pthread_cancel(eth->app_opt.thd[eth->app_opt.thd_nr]);
+    if (pcancel != 0) {
+        printf("Can't cancel stats thread %" PRIu32 ", returned %" PRId32 "\n", eth->thd_opt[eth->app_opt.thd_nr].thd_id, pcancel);
+    }
+
+    void *thd_ret = NULL;
+    pthread_join(eth->app_opt.thd[eth->app_opt.thd_nr], &thd_ret);
+
+
+    etherate_cleanup(eth);
+
+
+    exit(signal);
+
+}
+
+
+
+void thread_cleanup(void *thd_opt_p) {
+
+    struct thd_opt *thd_opt = thd_opt_p;
+
+    if (thd_opt->quit)
+        return;
+
+    thd_opt->quit = 1;
+
+    if (thd_opt->mmap_buf != NULL) {
+        if (munmap(thd_opt->mmap_buf, (thd_opt->block_sz * thd_opt->block_nr)) != 0)
+            tperror(thd_opt, "Can't free worker mmap buffer");
+    }
+
+    if (thd_opt->sock != 0) {
+        if (close(thd_opt->sock) != 0)
+            tperror(thd_opt, "Can't close worker socket");
+    }
+
+    free(thd_opt->err_str);
+    free(thd_opt->ring);
+    free(thd_opt->rx_buffer);
+    free(thd_opt->tx_buffer);
+
+}
+
+
+
+void thread_init(struct etherate *eth, uint16_t thread) {
+
+    // Set up thread local copies of all settings
+    eth->thd_opt[thread].block_frm_sz    = eth->frm_opt.block_frm_sz;
+    eth->thd_opt[thread].block_nr        = eth->frm_opt.block_nr;
+    eth->thd_opt[thread].block_sz        = eth->frm_opt.block_sz;
+    eth->thd_opt[thread].err_len         = eth->app_opt.err_len;
+    eth->thd_opt[thread].err_str         = (char*)calloc(eth->app_opt.err_len, 1);
+    eth->thd_opt[thread].fanout_grp      = eth->app_opt.fanout_grp;
+    eth->thd_opt[thread].frame_nr        = eth->frm_opt.frame_nr;
+    eth->thd_opt[thread].frame_sz        = eth->frm_opt.frame_sz;
+    eth->thd_opt[thread].frm_sz_max      = DEF_FRM_SZ_MAX;
+    eth->thd_opt[thread].if_index        = eth->sk_opt.if_index;
+    strncpy((char*)eth->thd_opt[thread].if_name, (char*)eth->sk_opt.if_name, IF_NAMESIZE);
+    eth->thd_opt[thread].mmap_buf        = NULL;
+    eth->thd_opt[thread].msgvec_vlen     = eth->sk_opt.msgvec_vlen;
+    eth->thd_opt[thread].quit            = 0;
+    eth->thd_opt[thread].ring            = NULL;
+    eth->thd_opt[thread].rx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
+    eth->thd_opt[thread].rx_bytes        = 0;
+    eth->thd_opt[thread].rx_frms         = 0;
+    eth->thd_opt[thread].started         = 0;
+    eth->thd_opt[thread].sk_mode         = eth->app_opt.sk_mode;
+    eth->thd_opt[thread].sk_type         = eth->app_opt.sk_type;
+    eth->thd_opt[thread].thd_nr          = eth->app_opt.thd_nr;
+    eth->thd_opt[thread].thd_id          = 0;
+    eth->thd_opt[thread].tx_buffer       = (uint8_t*)calloc(DEF_FRM_SZ_MAX,1);
+    eth->thd_opt[thread].tx_bytes        = 0;
+    eth->thd_opt[thread].tx_frms         = 0;
+    eth->thd_opt[thread].verbose         = eth->app_opt.verbose;
+
+    if (eth->thd_opt[thread].err_str == NULL   ||
+        eth->thd_opt[thread].rx_buffer == NULL ||
+        eth->thd_opt[thread].tx_buffer == NULL) {
+        printf("Failed to calloc() per-thread buffers!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the dummy frame into the thread local Tx buffer
+    memcpy(eth->thd_opt[thread].tx_buffer, eth->frm_opt.tx_buffer, DEF_FRM_SZ_MAX);
+
+}
+
+
+
+void tperror(struct thd_opt *thd_opt, const char *msg) {
 
     printf("%" PRIu32 ":%s (%s)\n", thd_opt->thd_id, msg, strerror_r(errno, thd_opt->err_str, thd_opt->err_len));
 

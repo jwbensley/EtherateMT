@@ -34,31 +34,56 @@ void *tpacket_v3_init(void* thd_opt_p) {
     struct thd_opt *thd_opt = thd_opt_p;
 
 
+    // Save the thread tid
     pid_t thread_id;
     thread_id = syscall(SYS_gettid);
     thd_opt->thd_id = thread_id;
+
+
+    // Set the thread cancel type and register the cleanup handler
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+    pthread_cleanup_push(thread_cleanup, thd_opt_p);
     
+
     if (thd_opt->verbose)
-        printf("%" PRIu32 ":Worker thread started\n", thd_opt->thd_id);
+        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
 
 
     tpacket_v3_ring_align(thd_opt_p);
 
-    int32_t sk_setup_ret = tpacket_v3_sock(thd_opt);
-    if (sk_setup_ret != EXIT_SUCCESS) {
-        exit(EXIT_FAILURE);
+
+    if (tpacket_v3_sock(thd_opt) != EXIT_SUCCESS) {
+        pthread_exit((void*)EXIT_FAILURE);
     }
 
 
     if (thd_opt->sk_mode == SKT_RX) {
         tpacket_v3_rx(thd_opt_p);
+
     } else if (thd_opt->sk_mode == SKT_TX) {
+        // af_packet.c: packet_set_ring()
+        /* Opening a Tx-ring is NOT supported in TPACKET_V3 */
+        #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0)
         tpacket_v3_tx(thd_opt_p);
+        #else
+        uint32_t version     = (LINUX_VERSION_CODE >> 16);
+        uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
+        uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
+        printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ","
+               "TPACKET_V3 with PACKET_TX_RING requires 4.11.\n",
+               version, patch_level, sub_level);
+        pthread_exit((void*)EXIT_FAILURE);
+        #endif
+        
     } else if (thd_opt->sk_mode == SKT_BIDI) {
         printf("%" PRIu32 ":Not implemented yet!\n", thd_opt->thd_id);
-        exit(1);
+        pthread_exit((void*)EXIT_FAILURE);
     }
 
+
+    pthread_cleanup_pop(0);
+
+    
     return NULL;
 
 }
@@ -94,21 +119,21 @@ void tpacket_v3_ring_align(struct thd_opt *thd_opt) {
     }
 
     // Block size must be an integer multiple of pages
-    if ( (thd_opt->block_sz < getpagesize()) ||
-         (thd_opt->block_sz % getpagesize() != 0)) {
+    if ( (thd_opt->block_sz < (uint32_t)getpagesize()) ||
+         (thd_opt->block_sz % (uint32_t)getpagesize() != 0)) {
 
-        uint32_t base = (thd_opt->block_sz / getpagesize()) + 1;
+        uint32_t base = (thd_opt->block_sz / (uint32_t)getpagesize()) + 1;
         
         if (thd_opt->verbose) {
             printf("%" PRIu32 ":Block size (%" PRIu32 ") is not a multiple of the page size (%" PRIu32 "),"
                    " padding to %" PRIu32 "!\n",
                    thd_opt->thd_id,
                    thd_opt->block_sz,
-                   getpagesize(),
-                   (base * getpagesize()));
+                   (uint32_t)getpagesize(),
+                   (base * (uint32_t)getpagesize()));
         }
         
-        thd_opt->block_sz = (base * getpagesize());
+        thd_opt->block_sz = (base * (uint32_t)getpagesize());
     }
 
 
@@ -153,9 +178,9 @@ void tpacket_v3_ring_align(struct thd_opt *thd_opt) {
 
         thd_opt->block_sz = next_power * thd_opt->block_frm_sz;            
 
-        if (thd_opt->block_sz % getpagesize() != 0) {
-            uint32_t base = (thd_opt->block_sz / getpagesize()) + 1;
-            thd_opt->block_sz = (base * getpagesize());
+        if (thd_opt->block_sz % (uint32_t)getpagesize() != 0) {
+            uint32_t base = (thd_opt->block_sz / (uint32_t)getpagesize()) + 1;
+            thd_opt->block_sz = (base * (uint32_t)getpagesize());
         }
 
         thd_opt->block_frm_sz = thd_opt->block_sz / next_power;
@@ -220,26 +245,26 @@ void tpacket_v3_ring_init(struct thd_opt *thd_opt) {
     tpacket_req3->tp_feature_req_word = 0; //TP_FT_REQ_FILL_RXHASH;  ///// What does this do? - the size of per-block private area. This area can be used by a user to store arbitrary information associated with each block.
     tpacket_req3->tp_sizeof_priv      = 0; ///// What does this do? -  a set of flags (actually just one at the moment), which allows to enable some additional functionality.
 
-/* af_packet.c requires tp_retire_blk_tov, tp_feature_req_word and tp_sizeof_priv = 0:
+    /* af_packet.c requires tp_retire_blk_tov, tp_feature_req_word and tp_sizeof_priv = 0:
 
-packet_set_ring() {
-...
-case TPACKET_V3:
-    // Block transmit is not supported yet
-    if (!tx_ring) {
-        init_prb_bdqc(po, rb, pg_vec, req_u);
-    } else {
-        struct tpacket_req3 *req3 = &req_u->req3;
+    packet_set_ring() {
+    ...
+    case TPACKET_V3:
+        // Block transmit is not supported yet
+        if (!tx_ring) {
+            init_prb_bdqc(po, rb, pg_vec, req_u);
+        } else {
+            struct tpacket_req3 *req3 = &req_u->req3;
 
-        if (req3->tp_retire_blk_tov ||
-            req3->tp_sizeof_priv ||
-            req3->tp_feature_req_word) {
-            err = -EINVAL;
-            goto out;
+            if (req3->tp_retire_blk_tov ||
+                req3->tp_sizeof_priv ||
+                req3->tp_feature_req_word) {
+                err = -EINVAL;
+                goto out;
+            }
         }
     }
-}
-*/
+    */
 
 }
 
@@ -249,50 +274,53 @@ void tpacket_v3_rx(struct thd_opt *thd_opt) {
 
     struct pollfd pfd;
     memset(&pfd, 0, sizeof(pfd));
-    pfd.fd = thd_opt->sock_fd;
+    pfd.fd = thd_opt->sock;
     pfd.events = POLLIN | POLLERR;
     pfd.revents = 0;
 
 
-    uint32_t current_block_num = 0;
+    uint32_t blk_num = 0;
     struct block_desc *pbd = NULL;
 
     thd_opt->started = 1;
     
     while (1) {
-        pbd = (struct block_desc *) thd_opt->rd[current_block_num].iov_base;
+        pbd = (struct block_desc *) thd_opt->ring[blk_num].iov_base;
  
         if ((pbd->h1.block_status & TP_STATUS_USER) == 0) {
             int32_t poll_ret = poll(&pfd, 1, -1);
 
             if (poll_ret == -1) {
                 tperror(thd_opt, "Rx poll error");
-                exit(EXIT_FAILURE);
+                pthread_exit((void*)EXIT_FAILURE);
             }
 
-            continue;
+            if (pfd.revents != POLLIN)
+                printf("Unexpected poll event (%d)", pfd.revents);
+
         }
 
 
-        uint32_t num_pkts = pbd->h1.num_pkts;
+        uint32_t num_frms = pbd->h1.num_pkts;
         uint32_t bytes = 0;
         struct tpacket3_hdr *ppd;
 
         ppd = (struct tpacket3_hdr *) ((uint8_t *) pbd + pbd->h1.offset_to_first_pkt);
 
-        for (uint32_t i = 0; i < num_pkts; ++i) {
+        for (uint32_t i = 0; i < num_frms; ++i) {
             bytes += ppd->tp_snaplen;
 
             ppd = (struct tpacket3_hdr *) ((uint8_t *) ppd + ppd->tp_next_offset);
         }
 
 
-        thd_opt->rx_pkts += num_pkts;
+        thd_opt->rx_frms += num_frms;
         thd_opt->rx_bytes += bytes;
 
+        // Reset the block stats back to KERNEL (userland is finished with it)
         pbd->h1.block_status = TP_STATUS_KERNEL;
 
-        current_block_num = (current_block_num + 1) % thd_opt->block_nr;
+        blk_num = (blk_num + 1) % thd_opt->block_nr;
     }   
 
 
@@ -302,11 +330,13 @@ void tpacket_v3_rx(struct thd_opt *thd_opt) {
 
 int32_t tpacket_v3_sock(struct thd_opt *thd_opt) {
 
+    // TPACKET_V3 ring settings
     struct  tpacket_req3 tpacket_req3;
     memset(&tpacket_req3, 0, sizeof(tpacket_req3));
     thd_opt->tpacket_req3 = &tpacket_req3;
     thd_opt->tpacket_req3_sz = sizeof(struct tpacket_req3);
 
+    thd_opt->tpacket_ver = TPACKET_V3;
 
     if (thd_opt->sk_mode == SKT_RX) {
         thd_opt->ring_type = PACKET_RX_RING;
@@ -316,59 +346,34 @@ int32_t tpacket_v3_sock(struct thd_opt *thd_opt) {
 
 
     // Create a raw socket
-    thd_opt->sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    thd_opt->sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
    
-    if (thd_opt->sock_fd == -1) {
+    if (thd_opt->sock == -1) {
         tperror(thd_opt, "Can't create AF_PACKET socket");
         return EXIT_FAILURE;
     }
 
 
-    // Enable promiscuous mode
-    int32_t sock_promisc = sock_op(S_O_PROMISC_ADD, thd_opt);
-
-    if (sock_promisc == -1) {
-        tperror(thd_opt, "Can't enable promisc mode");
-        return EXIT_FAILURE;
-    }
-
-
-    // Bind socket to interface.
-    // This is mandatory (with zero copy) to know the header size of frames
-    // used in the circular buffer:
-    int32_t sock_bind = sock_op(S_O_BIND, thd_opt);
-
-    if (sock_bind == -1) {
+    // Bind socket to interface,
+    // this is mandatory (with zero copy) to know the header size of frames
+    // used in the circular buffer
+    if (sock_op(S_O_BIND, thd_opt) == -1) {
         tperror(thd_opt, "Can't bind to AF_PACKET socket");
         return EXIT_FAILURE;
     }
 
 
-    // Increase the socket Tx/Rx queue size so that the entire PACKET_MMAP ring
-    // can fit into the socket Tx queue. The Kernel will double the value provided
-    // to allow for sk_buff overhead:
-    int32_t sock_qlen = sock_op(S_O_QLEN, thd_opt);
-
-    if (sock_qlen == -1) {
-        return EXIT_FAILURE;
-    }
-
-
-    // Bypass the kernel qdisc layer and push packets directly to the driver
-    int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
-
-    if (sock_qdisc == -1) {
+    // Bypass the kernel qdisc layer and push frames directly to the driver
+    if (sock_op(S_O_QDISC, thd_opt) == -1) {
         tperror(thd_opt, "Can't enable QDISC bypass on socket");
         return EXIT_FAILURE;
     }
 
 
-    // Enable Tx ring to skip over malformed packets
+    // Enable Tx ring to skip over malformed frames
     if (thd_opt->sk_mode == SKT_TX) {
 
-        int32_t sock_lossy = sock_op(S_O_LOSSY, thd_opt);
-
-        if (sock_lossy == -1) {
+        if (sock_op(S_O_LOSSY, thd_opt) == -1) {
             tperror(thd_opt, "Can't enable PACKET_LOSS on socket");
             return EXIT_FAILURE;
         }
@@ -376,28 +381,45 @@ int32_t tpacket_v3_sock(struct thd_opt *thd_opt) {
     }
 
 
-    // Request hardware timestamping of received packets
-    int32_t sock_nic_ts = sock_op(S_O_NIC_TS, thd_opt);
-
-    if (sock_nic_ts == -1) {
-        tperror(thd_opt, "Cant't set ring timestamp source");
-        // If hardware timestamps aren't supported the Kernel will fall back to
-        // software, no need to exit on error
+    // Set the socket Rx timestamping settings
+    if (sock_op(S_O_TS, thd_opt) == -1) {
+        tperror(thd_opt, "Can't set socket Rx timestamp source");
     }
 
 
-    // Set the socket timestamping settings:
-    int32_t sock_ts = sock_op(S_O_TS, thd_opt);
+    // Join this socket to the fanout group
+    if (thd_opt->thd_nr > 1) {
 
-    if (sock_ts == -1) {
-        tperror(thd_opt, "Cant't set socket Rx timestamp source");
+        if (sock_op(S_O_FANOUT, thd_opt) < 0) {
+            tperror(thd_opt, "Can't configure socket fanout");
+            return EXIT_FAILURE;
+        } else {
+            if (thd_opt->verbose)
+                printf("%" PRIu32 ":Joint fanout group %" PRIu32 "\n",
+                       thd_opt->thd_id, thd_opt->fanout_grp);
+        }
+
+    }
+
+
+    // Increase the socket Tx/Rx queue size so that the entire PACKET_MMAP ring
+    // can fit into the socket Tx queue. The Kernel will double the value provided
+    // to allow for sk_buff overhead:
+    if (sock_op(S_O_QLEN, thd_opt) == -1) {
+        tperror(thd_opt, "Can't change the socket Tx queue length");
+        return EXIT_FAILURE;
+    }
+
+
+    // Request hardware timestamping of received packets. If hardware
+    // timestamps aren't supported the Kernel will fall back to software
+    if (sock_op(S_O_NIC_TS, thd_opt) == -1) {
+        tperror(thd_opt, "Can't set ring timestamp source");
     }
 
 
     // Set the TPACKET version to 3
-    int32_t sock_tpk_ver = sock_op(S_O_VER_TP3, thd_opt);
-
-    if (sock_tpk_ver == -1) {
+    if (sock_op(S_O_VER_TP, thd_opt) == -1) {
         tperror(thd_opt, "Can't set socket tpacket version");
         return EXIT_FAILURE;
     }
@@ -405,51 +427,29 @@ int32_t tpacket_v3_sock(struct thd_opt *thd_opt) {
     
     // Enable the Tx/Rx ring buffer
     tpacket_v3_ring_init(thd_opt);
-
-    int32_t sock_ring = sock_op(S_O_RING_TP3, thd_opt);
-    
-    if (sock_ring == -1) {
+    if (sock_op(S_O_RING_TP3, thd_opt) == -1) {
         tperror(thd_opt, "Can't enable Tx/Rx ring for socket");
         return EXIT_FAILURE;
     }
     
 
     // mmap() the Tx/Rx ring buffer against the socket
-    ////// af_packet.c L4070:   /* Opening a Tx-ring is NOT supported in TPACKET_V3 */
-    int32_t sock_mmap = sock_op(S_O_MMAP_TP23, thd_opt); 
-
-    if (sock_mmap == -1) { ///// Standardise these ret value checks
+    if (sock_op(S_O_MMAP_TP23, thd_opt) == -1) {
         tperror(thd_opt, "Can't mmap ring");
         return EXIT_FAILURE;
     }
 
 
-    // Per bock rings in Rx mode (TPACKET_V3) /////
-    thd_opt->rd = (struct iovec*)calloc(tpacket_req3.tp_block_nr * sizeof(struct iovec), 1);
-    if (thd_opt->rd == NULL) {
+    // Allocate an iovec for each block within the ring
+    // Each block can hold multiple frames in TPACKET_V3)
+    thd_opt->ring = (struct iovec*)calloc(tpacket_req3.tp_block_nr * sizeof(struct iovec), 1);
+    if (thd_opt->ring == NULL) {
         tperror(thd_opt, "Can't calloc ring buffer");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
-
     for (uint16_t i = 0; i < tpacket_req3.tp_block_nr; ++i) {
-        thd_opt->rd[i].iov_base = thd_opt->mmap_buf + (i * tpacket_req3.tp_block_size);
-        thd_opt->rd[i].iov_len  = tpacket_req3.tp_block_size;
-    }
-
-
-    // Join this socket to the fanout group
-    if (thd_opt->thd_nr > 1) {
-
-        int32_t sock_fanout = sock_op(S_O_FANOUT, thd_opt);
-
-        if (sock_fanout < 0) {
-            tperror(thd_opt, "Can't configure fanout");
-            return EXIT_FAILURE;
-        } else {
-            if (thd_opt->verbose)
-            printf("%" PRIu32 ":Joint fanout group %" PRId32 "...\n", thd_opt->thd_id, thd_opt->fanout_grp);
-        }
-
+        thd_opt->ring[i].iov_base = thd_opt->mmap_buf + (i * tpacket_req3.tp_block_size);
+        thd_opt->ring[i].iov_len  = tpacket_req3.tp_block_size;
     }
 
 
@@ -465,11 +465,11 @@ void tpacket_v3_stats(struct thd_opt *thd_opt, uint64_t *rx_drops, uint64_t *rx_
     memset(&tp3_stats, 0, sizeof(tp3_stats));
 
     socklen_t stats_len = sizeof(tp3_stats);
-    int32_t sock_stats = getsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_STATISTICS, &tp3_stats, &stats_len);
+    int32_t sock_stats = getsockopt(thd_opt->sock, SOL_PACKET, PACKET_STATISTICS, &tp3_stats, &stats_len);
 
     if (sock_stats < 0) {
         tperror(thd_opt, "Couldn't get TPACKET V3 Rx socket stats");
-        exit(EXIT_FAILURE);
+        pthread_exit((void*)EXIT_FAILURE);
     }
 
     *rx_drops += tp3_stats.tp_drops;
@@ -483,7 +483,7 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
     
     struct tpacket3_hdr *hdr;
     uint8_t *data;
-    uint16_t i;
+    uint32_t i;
     int64_t tx_bytes = 0;
     
 
@@ -513,7 +513,7 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
 
         for (i = 0; i < thd_opt->frame_nr; i += 1) {
             hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
-            // TPACKET2_HDRLEN == (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))
+            // TPACKET2_HDRLEN == (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))   ///// Update for TPACKET V3
             // For raw Ethernet frames where the layer 2 headers are present
             // and the ring blocks are already aligned its fine to use:
             // sizeof(struct tpacket2_hdr)
@@ -526,23 +526,22 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
 
         ///// Any difference on > 4.1 kernel with real NIC?
         // I think MSG_DONTWAIT is having no affect here? Test on real NIC with NET_TX on seperate core
-        tx_bytes = sendto(thd_opt->sock_fd, NULL, 0, MSG_DONTWAIT, NULL, 0);
+        tx_bytes = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
 
 
         if (tx_bytes == -1) {
 
             if (errno != ENOBUFS) {
                 tperror(thd_opt, "PACKET_MMAP Tx error");
-                exit(EXIT_FAILURE);
+                pthread_exit((void*)EXIT_FAILURE);
             } else {
                 thd_opt->stalling = 1;
             }
         
-        } else {
-            thd_opt->tx_pkts  += (tx_bytes / thd_opt->frame_sz); ///// Replace all instances "packet"/"pkt" with "frame"/"frm"
-            thd_opt->tx_bytes += tx_bytes;
         }
-
+        
+        thd_opt->tx_frms  += (tx_bytes / thd_opt->frame_sz);
+        thd_opt->tx_bytes += tx_bytes;
 
     }
 

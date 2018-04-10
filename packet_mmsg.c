@@ -33,17 +33,24 @@ void *mmsg_init(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
+
+    // Save the thread tid
     pid_t thread_id;
     thread_id = syscall(SYS_gettid);
     thd_opt->thd_id = thread_id;
+
+
+    // Set the thread cancel type and register the cleanup handler
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+    pthread_cleanup_push(thread_cleanup, thd_opt_p);
     
+
     if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thread_id);
+        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
 
 
-    int32_t sk_setup_ret = mmsg_sock(thd_opt);
-    if (sk_setup_ret != EXIT_SUCCESS) {
-        exit(EXIT_FAILURE);
+    if (mmsg_sock(thd_opt) != EXIT_SUCCESS) {
+        pthread_exit((void*)EXIT_FAILURE);
     }
 
 
@@ -52,6 +59,10 @@ void *mmsg_init(void* thd_opt_p) {
     } else if (thd_opt->sk_mode == SKT_TX) {
         mmsg_tx(thd_opt_p);
     }
+
+
+    pthread_cleanup_pop(0);
+    
 
     return NULL;
 
@@ -70,7 +81,7 @@ void mmsg_rx(struct thd_opt *thd_opt) {
 
     thd_opt->started = 1;
 
-    for (int i = 0; i < thd_opt->msgvec_vlen; i += 1) {
+    for (uint32_t i = 0; i < thd_opt->msgvec_vlen; i += 1) {
         iov[i].iov_base = thd_opt->rx_buffer;
         iov[i].iov_len = thd_opt->frame_sz;
         mmsg_hdr[i].msg_hdr.msg_iov = &iov[i];
@@ -82,18 +93,18 @@ void mmsg_rx(struct thd_opt *thd_opt) {
 
     while(1) {
 
-        rx_frames = recvmmsg(thd_opt->sock_fd, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL);
+        rx_frames = recvmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL);
         
         if (rx_frames == -1) {
             tperror(thd_opt, "Socket Rx error");
-            exit(EXIT_FAILURE);
+            pthread_exit((void*)EXIT_FAILURE);
         }
 
         for (int i = 0; i < rx_frames; i++) {
             thd_opt->rx_bytes += mmsg_hdr[i].msg_len;
         }
         
-        thd_opt->rx_pkts += rx_frames;
+        thd_opt->rx_frms += rx_frames;
 
     }
 
@@ -103,58 +114,34 @@ void mmsg_rx(struct thd_opt *thd_opt) {
 
 int32_t mmsg_sock(struct thd_opt *thd_opt) {
 
+
     // Create a raw socket
-    thd_opt->sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    thd_opt->sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
    
-    if (thd_opt->sock_fd == -1) {
+    if (thd_opt->sock == -1) {
         tperror(thd_opt, "Can't create AF_PACKET socket");
         return EXIT_FAILURE;
     }
 
 
-    // Enable promiscuous mode
-    int32_t sock_promisc = sock_op(S_O_PROMISC_ADD, thd_opt);
-
-    if (sock_promisc == -1) {
-        tperror(thd_opt, "Can't enable promisc mode");
-        return EXIT_FAILURE;
-    }
-
-
-    // Bind socket to interface.
-    int32_t sock_bind = sock_op(S_O_BIND, thd_opt);
-
-    if (sock_bind == -1) {
+    // Bind socket to interface
+    if (sock_op(S_O_BIND, thd_opt) == -1) {
         tperror(thd_opt, "Can't bind to AF_PACKET socket");
         return EXIT_FAILURE;
     }
 
 
-    // Increase the socket Tx queue size so that the entire msg vector can fit
-    // into the socket Tx/Rx queue. The Kernel will double the value provided
-    // to allow for sk_buff overhead:
-    int32_t sock_qlen = sock_op(S_O_QLEN, thd_opt);
-
-    if (sock_qlen == -1) {
-        return EXIT_FAILURE;
-    }
-
-
-    // Bypass the kernel qdisc layer and push packets directly to the driver
-    int32_t sock_qdisc = sock_op(S_O_QDISC, thd_opt);
-
-    if (sock_qdisc == -1) {
+    // Bypass the kernel qdisc layer and push frames directly to the driver
+    if (sock_op(S_O_QDISC, thd_opt) == -1) {
         tperror(thd_opt, "Can't enable QDISC bypass on socket");
         return EXIT_FAILURE;
     }
 
 
-    // Enable Tx ring to skip over malformed packets
+    // Enable Tx ring to skip over malformed frames
     if (thd_opt->sk_mode == SKT_TX) {
 
-        int32_t sock_lossy = sock_op(S_O_LOSSY, thd_opt);
-
-        if (sock_lossy == -1) {
+        if (sock_op(S_O_LOSSY, thd_opt) == -1) {
             tperror(thd_opt, "Can't enable PACKET_LOSS on socket");
             return EXIT_FAILURE;
         }
@@ -162,39 +149,35 @@ int32_t mmsg_sock(struct thd_opt *thd_opt) {
     }
 
 
-    // Request hardware timestamping of received packets
-    int32_t sock_nic_ts = sock_op(S_O_NIC_TS, thd_opt);
-
-    if (sock_nic_ts == -1) {
-        tperror(thd_opt, "Couldn't set ring timestamp source");
-        // If hardware timestamps aren't supported the Kernel will fall back to
-        // software, no need to exit on error
-    }
-
-
-    // Set the socket timestamping settings:
-    int32_t sock_ts = sock_op(S_O_TS, thd_opt);
-
-    if (sock_ts == -1) {
-        tperror(thd_opt, "Couldn't set socket Rx timestamp source");
+    // Set the socket Rx timestamping settings
+    if (sock_op(S_O_TS, thd_opt) == -1) {
+        tperror(thd_opt, "Can't set socket Rx timestamp source");
     }
 
 
     // Join this socket to the fanout group
     if (thd_opt->thd_nr > 1) {
 
-        int32_t sock_fanout = sock_op(S_O_FANOUT, thd_opt);
-
-        if (sock_fanout < 0) {
-            tperror(thd_opt, "Can't configure fanout");
+        if (sock_op(S_O_FANOUT, thd_opt) < 0) {
+            tperror(thd_opt, "Can't configure socket fanout");
             return EXIT_FAILURE;
         } else {
             if (thd_opt->verbose)
-                printf("%" PRIu32 ":Joint fanout group %" PRId32 "\n",
+                printf("%" PRIu32 ":Joint fanout group %" PRIu32 "\n",
                        thd_opt->thd_id, thd_opt->fanout_grp);
         }
 
     }
+
+
+    // Increase the socket Tx queue size so that the entire msg vector can fit
+    // into the socket Tx/Rx queue. The Kernel will double the value provided
+    // to allow for sk_buff overhead:
+    if (sock_op(S_O_QLEN, thd_opt) == -1) {
+        tperror(thd_opt, "Can't change the socket Tx queue length");
+        return EXIT_FAILURE;
+    }
+
 
 
     return EXIT_SUCCESS;
@@ -214,7 +197,7 @@ void mmsg_tx(struct thd_opt *thd_opt) {
 
     thd_opt->started = 1;
 
-    for (int i = 0; i < thd_opt->msgvec_vlen; i += 1) {
+    for (uint32_t i = 0; i < thd_opt->msgvec_vlen; i += 1) {
         iov[i].iov_base = thd_opt->tx_buffer;
         iov[i].iov_len = thd_opt->frame_sz;
         mmsg_hdr[i].msg_hdr.msg_iov = &iov[i];
@@ -224,15 +207,15 @@ void mmsg_tx(struct thd_opt *thd_opt) {
 
     while (1) {
 
-        tx_frames = sendmmsg(thd_opt->sock_fd, mmsg_hdr, thd_opt->msgvec_vlen, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
+        tx_frames = sendmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
 
         if (tx_frames == -1) {
             tperror(thd_opt, "Socket Tx error");
-            exit(EXIT_FAILURE);
+            pthread_exit((void*)EXIT_FAILURE);
         }
 
         thd_opt->tx_bytes += (tx_frames * thd_opt->frame_sz);
-        thd_opt->tx_pkts += tx_frames;
+        thd_opt->tx_frms += tx_frames;
     }
 
 }

@@ -41,18 +41,19 @@
 #include <pthread.h>          // pthread_*()
 #include <sys/socket.h>       // socket()
 #include <linux/sockios.h>    // SIOCSHWTSTAMP
+#include <signal.h>           // signal()
 #include <stdlib.h>           // calloc(), exit(), EXIT_FAILURE, EXIT_SUCCESS, rand(), RAND_MAX, strtoul()
 #include <stdio.h>            // FILE, fclose(), fopen(), fscanf(), perror(), printf()
 #include <string.h>           // memcpy(), memset(), strncpy()
 #include <sys/syscall.h>      // SYS_gettid
 #include "sysexits.h"         // EX_NOPERM, EX_PROTOCOL, EX_SOFTWARE
 #include <unistd.h>           // getpagesize(), getpid(), getuid(), read(), sleep()
-#include <linux/version.h>    // KERNEL_VERSION(), LINUX_VERSION_CODE ///// Can we renmove this now?
+#include <linux/version.h>    // KERNEL_VERSION(), LINUX_VERSION_CODE
 
 
 
 // Global constants:
-#define app_version "MT 0.6.beta 2018-03"
+#define app_version "MT 0.7.beta 2018-04"
 
 
 
@@ -83,14 +84,16 @@
 
 // Application behaviour options:
 struct app_opt {
-    uint8_t  err_len;
-    char     *err_str;
-    int32_t  fanout_grp;    
-    uint8_t  sk_mode;
-    uint8_t  sk_type;
-    uint16_t thd_nr;
-    uint8_t  thd_sk_affin; ///// Add CLI arg, try to avoid split NUMA node?
-    uint8_t  verbose;
+    uint8_t        err_len;
+    char           *err_str;
+    int32_t        fanout_grp;
+    uint8_t        sk_mode;      // Tx/Rx/Bidi
+    uint8_t        sk_type;      // PACKET_MMAP, send(), sendmmsg() etc.
+    pthread_t      *thd;
+    uint8_t        thd_affin; ///// Add CLI arg, try to avoid split NUMA node?
+    pthread_attr_t *thd_attr;
+    uint16_t       thd_nr;
+    uint8_t        verbose;
 };
 
 // Frame and ring buffer options:
@@ -125,33 +128,39 @@ struct thd_opt {
     uint16_t frm_sz_max;
     int32_t  if_index;
     uint8_t  if_name[IF_NAMESIZE];
-    uint8_t* mmap_buf;
+    uint8_t* mmap_buf;        // Buffer used for PACKET_MMAP ring
     uint32_t msgvec_vlen;
-    struct   iovec* rd; ///// RENAME
+    struct   iovec* ring;     // PACKET_MMAP ring
+    uint8_t  quit;            // Signal stats thread to exit
     uint8_t  *rx_buffer;
     uint64_t rx_bytes;
-    uint64_t rx_pkts;
-    uint8_t  sk_mode;
-    uint8_t  sk_type;
-    int32_t  sock_fd;
-    uint8_t  started;
-    uint8_t  stalling;   // Socket is returning ENOBUFS
-    uint16_t thd_nr; ///// Keep or remove?
-    uint16_t thd_id;
-    void     *tpacket_req3; // v3 for Rx ///// These need to be wrapped in a Kernel version check? Make them as pointers and move to local .c/.h files
-    uint8_t  tpacket_req3_sz;
-    void     *tpacket_req;  // v2 for Tx
-    uint8_t  tpacket_req_sz;
-    uint16_t ring_type;
-    uint8_t  *tx_buffer;
-    uint64_t tx_bytes;
-    uint64_t tx_pkts;
-    uint8_t  verbose;
+    uint64_t rx_frms;
+    uint8_t  sk_mode;         // Tx/Rx/Bidi
+    uint8_t  sk_type;         // PACKET_MMAP, send(), sendmmsg() etc.
+    int32_t  sock;            // Socket file descriptor
+    uint8_t  started;         // Has Tx or Rx loop started?
+    uint8_t  stalling;        // Socket is returning ENOBUFS
+    uint32_t thd_id;          // Thread ID of "this" thread
+    uint16_t thd_nr;          // If >1, joing a FANOUT group
+    void     *thd_ret;        // Thread exit status
+    int32_t  tpacket_ver;     // TPACKET_V2 || TPACKET_V3
+    void     *tpacket_req3;   // TPACKET V3
+    uint8_t  tpacket_req3_sz; // TPACKET V3
+    void     *tpacket_req;    // TPACKET V2
+    uint8_t  tpacket_req_sz;  // TPACKET V2
+    uint16_t ring_type;       // PACKET_TX_RING/PACKET_RX_RING
+    uint8_t  *tx_buffer;      // Tx frame buffer
+    uint64_t tx_bytes;        // Total bytes sent
+    uint64_t tx_frms;         // Total packets sent
+    uint8_t  verbose;         // Enable verbose output
 };
 
 struct etherate {
     struct   app_opt app_opt;
     struct   frm_opt frm_opt;
+    struct   ifreq ifr;
     struct   sk_opt sk_opt;
     struct   thd_opt *thd_opt;
 };
+
+struct etherate *eth_p;

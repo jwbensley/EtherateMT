@@ -30,15 +30,14 @@
 #define S_O_BIND        3
 #define S_O_QLEN        4
 #define S_O_LOSSY       5
-#define S_O_VER_TP2     6
-#define S_O_VER_TP3     7
-#define S_O_NIC_TS      8
-#define S_O_TS          9
-#define S_O_QDISC       10
-#define S_O_RING_TP2    11
-#define S_O_RING_TP3    12
-#define S_O_MMAP_TP23   13
-#define S_O_FANOUT      14
+#define S_O_VER_TP      6
+#define S_O_NIC_TS      7
+#define S_O_TS          8
+#define S_O_QDISC       9
+#define S_O_RING_TP2    10
+#define S_O_RING_TP3    11
+#define S_O_MMAP_TP23   12
+#define S_O_FANOUT      13
 
 
 

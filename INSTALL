@@ -1,85 +1,197 @@
-gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11
+/* Perform a "regular" compile */
+
+gcc -o etherate_mt etherate_mt.c -lpthread -O3 --std=c11
+
+
+
+/ * Perform a "strict" compile - requires a more recent GCC version,
+    to check for various code issues */
+
+gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
 
 /*
-  Compile:
-
   -lpthread
   Compile with support for Pthreads
 
   -Wall
-  Turns on all optional warnings which are desirable for normal code.  At present this is -Wcomment, -Wtrigraphs, -Wmultichar and a warning about integer
-  promotion causing a change of sign in "#if" expressions.  Note that many of the preprocessor's warnings are on by default and have no options to control
-  them.
+   Turns on all optional warnings which are desirable for normal code.
+   At present this is -Wcomment, -Wtrigraphs, -Wmultichar and a warning about
+   integer promotion causing a change of sign in "#if" expressions.  Note that
+   many of the preprocessor's warnings are on by default and have no options to
+   control them.
+
+   -Wall turns on the following warning flags:
+   -Waddress -Warray-bounds=1 (only with -O2) -Wc++11-compat  -Wc++14-compat -Wchar-subscripts -Wenum-compare (in C/ObjC; this is on by default in C++)
+   -Wimplicit-int (C and Objective-C only) -Wimplicit-function-declaration (C and Objective-C only) -Wcomment -Wformat -Wmain (only for C/ObjC and unless
+   -ffreestanding) -Wmaybe-uninitialized -Wmissing-braces (only for C/ObjC) -Wnonnull -Wopenmp-simd -Wparentheses -Wpointer-sign -Wreorder -Wreturn-type
+   -Wsequence-point -Wsign-compare (only in C++) -Wstrict-aliasing -Wstrict-overflow=1 -Wswitch -Wtrigraphs -Wuninitialized -Wunknown-pragmas
+   -Wunused-function -Wunused-label -Wunused-value -Wunused-variable -Wvolatile-register-var
 
   -Werror
-  Make all warnings into hard errors.  Source code which triggers warnings will be rejected.
+   Make all warnings into hard errors.  Source code which triggers warnings will
+   be rejected.
 
   -pedantic
-   Issue all the mandatory diagnostics listed in the C standard.  Some of them are left out by default, since they trigger frequently on harmless code.
+   Issue all the mandatory diagnostics listed in the C standard.  Some of them
+   are left out by default, since they trigger frequently on harmless code.
 
   -ftrapv
-  This option generates traps for signed overflow on addition, subtraction, multiplication operations.
+   This option generates traps for signed overflow on addition, subtraction,
+   multiplication operations.
 
   -O3
-  With -O, the compiler tries to reduce code size and execution time, without performing any optimizations that take a great deal of compilation time.
-  -O1 Optimize.  Optimizing compilation takes somewhat more time, and a lot more memory for a large function.
-  -O2 Optimize even more.  GCC performs nearly all supported optimizations that do not involve a space-speed tradeoff.  As compared to -O, this option
-  increases both compilation time and the performance of the generated code.
+   With -O, the compiler tries to reduce code size and execution time, without
+   performing any optimizations that take a great deal of compilation time.
+  -O1 Optimize.  Optimizing compilation takes somewhat more time, and a lot
+   more memory for a large function.
+  -O2 Optimize even more.  GCC performs nearly all supported optimizations that
+   do not involve a space-speed tradeoff.  As compared to -O, this option
+   increases both compilation time and the performance of the generated code.
   -O3 Optimize yet more.
 
+  -Wjump-misses-init
+   Warn if a "goto" statement or a "switch" statement jumps forward across the
+   initialization of a variable, or jumps backward to a label after the
+   variable has been initialized.
+
+  -Wlogical-op
+   Warn about suspicious uses of logical operators in expressions. This
+   includes using logical operators in contexts where a bit-wise operator is
+   likely to be expected.
+
+  -Wshadow
+   Warn whenever a local variable or type declaration shadows another variable,
+   parameter, type, class member (in C++), or instance variable (in
+   Objective-C) or whenever a built-in function is shadowed.
+
+  -Wformat=2
+   -Wformat=1 checks calls to "printf" and "scanf", etc., to make sure that the
+   arguments supplied have types appropriate to the format string specified,
+   and that the conversions specified in the format string make sense. This
+   includes standard functions, and others specified by format attributes, in
+   the "printf", "scanf", "strftime" and "strfmon" families. -Wformat=2 enables
+   -Wformat=1 plus additional format checks, currently equivalent to -Wformat
+   -Wformat-nonliteral -Wformat-security -Wformat-y2k.
+
+  -Wformat-signedness
+   If -Wformat is specified, also warn if the format string requires an
+   unsigned argument and the argument is signed and vice versa.
+
+  -Wextra
+   This enables some extra warning flags that are not enabled by -Wall.
+   -Wclobbered -Wempty-body -Wignored-qualifiers -Wmissing-field-initializers
+   -Wmissing-parameter-type (C only) -Wold-style-declaration (C only)
+   -Woverride-init -Wsign-compare -Wtype-limits -Wuninitialized
+   -Wunused-parameter (only with -Wunused or -Wall) -Wunused-but-set-parameter
+   (only with -Wunused or -Wall).
+
+  -Wdouble-promotion
+   Give a warning when a value of type "float" is implicitly promoted to
+   "double".  CPUs with a 32-bit "single-precision" floating-point unit
+   implement "float" in hardware, but emulate "double" in software. On such a
+   machine, doing computations using "double" values is much more expensive
+   because of the overhead required for software emulation.
+
+  -Winit-self
+   Warn about uninitialized variables that are initialized with themselves.
+   Note this option can only be used with the -Wuninitialized option.
+   -Wuninitialized is included in -Wextra.
+
+  -Wtrampolines
+   Warn about trampolines generated for pointers to nested functions. A
+   trampoline is a small piece of data or code that is created at run time on
+   the stack when the address of a nested function is taken, and is used to
+   call the nested function indirectly. For some targets, it is made up of data
+   only and thus requires no special treatment. But, for most targets, it is
+   made up of code and thus requires the stack to be made executable in order
+   for the program to work properly.
+
+  -Wcast-qual
+   Warn whenever a pointer is cast so as to remove a type qualifier from the
+   target type. For example, warn if a "const char *" is cast to an ordinary
+   "char *". Also warn when making a cast that introduces a type qualifier in
+   an unsafe way. For example, casting "char **" to "const char **" is unsafe.
+
+  -Wcast-align
+   Warn whenever a pointer is cast such that the required alignment of the
+   target is increased. For example, warn if a "char *" is cast to an "int *"
+   on machines where integers can only be accessed at two- or four-byte
+   boundaries.
+
+  -Wwrite-strings
+   When compiling C, give string constants the type "const char[length]" so
+   that copying the address of one into a non-"const" "char *" pointer produces
+   a warning.  These warnings help you find at compile time code that can try
+   to write into a string constant, but only if you have been very careful
+   about using "const" in declarations and prototypes. Otherwise, it is just a
+   nuisance. This is why we did not make -Wall request these warnings.
+
 */
 
 
-/* 
-  Debug:
 
-  gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -fstack-protector-all -Og -g --std=c11 -fsanitize=address
+/* Perform a "debug" compile - use with tools like val/call/cache-grind,
+   GDB, perf etc */
 
-  -fstack-protector-all
-  Like -fstack-protector except that all functions are protected
-
-  -fsanitize=address
-  Enable AddressSanitizer, a fast memory error detector. Memory access instructions are instrumented to detect out-of-bounds and use-after-free bugs.
-  This will not work with Valgrind!
-
-  -Og
-  With -O, the compiler tries to reduce code size and execution time, without performing any optimizations that take a great deal of compilation time.
-  -O0 Reduce compilation time and make debugging produce the expected results.  This is the default.
-  -Og Optimize debugging experience.  -Og enables optimizations that do not interfere with debugging. It should be the optimization level of choice for the
-  standard edit-compile-debug cycle, offering a reasonable level of optimization while maintaining fast compilation and a good debugging experience.
-
-  -g
-  Produce debugging information in the operating system's native format (stabs, COFF, XCOFF, or DWARF 2).  GDB can work with this debugging information.
-
-*/
+gcc -o etherate_mt etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c11 -fsanitize=address
 
 /*
+
+  -fstack-protector-all
+   Like -fstack-protector except that all functions are protected.
+
+  -fsanitize=address
+   Enable AddressSanitizer, a fast memory error detector. Memory access
+   instructions are instrumented to detect out-of-bounds and use-after-free
+   bugs.
+   !! This will not work with Valgrind !!
+
+  -Og
+   With -O, the compiler tries to reduce code size and execution time, without
+   performing any optimizations that take a great deal of compilation time.
+  -O0
+   Reduce compilation time and make debugging produce the expected results.
+   This is the default.
+  -Og
+   Optimize debugging experience. -Og enables optimizations that do not
+   interfere with debugging. It should be the optimization level of choice for
+   the standard edit-compile-debug cycle, offering a reasonable level of
+   optimization while maintaining fast compilation and a good debugging
+   experience.
+
+  -g
+   Produce debugging information in the operating system's native format
+   (stabs, COFF, XCOFF, or DWARF 2). GDB can work with this debugging
+   information.
+
+
   Valgrind:
 
   sudo valgrind --leak-check=full --show-leak-kinds=all --leak-resolution=high --track-origins=yes --expensive-definedness-checks=yes --track-fds=yes ./etherate_mt -I 3 -r
 
   --leak-check=full
-  When enabled, search for memory leaks when the client program finishes.
+   When enabled, search for memory leaks when the client program finishes.
 
   --show-leak-kinds=all
-  Specifies the leak kinds to show in a full leak search.
+   Specifies the leak kinds to show in a full leak search.
 
   --leak-resolution=high
-  When doing leak checking, determines how willing Memcheck is to consider different backtraces to be the same for the purposes of merging multiple leaks
-  into a single leak report
+   When doing leak checking, determines how willing Memcheck is to consider
+   different backtraces to be the same for the purposes of merging multiple
+   leaks into a single leak report
 
   --track-origins=yes
-  Controls whether Memcheck tracks the origin of uninitialised values.
+   Controls whether Memcheck tracks the origin of uninitialised values.
 
   --expensive-definedness-checks=yes
-  Controls whether Memcheck should employ more precise but also more expensive (time consuming) algorithms when checking the definedness of a value.
+   Controls whether Memcheck should employ more precise but also more expensive
+   (time consuming) algorithms when checking the definedness of a value.
 
   --track-fds=yes
-  When enabled, Valgrind will print out a list of open file descriptors on exit.
+   When enabled, Valgrind will print out a list of open file descriptors on
+   exit.
 
-*/
 
-/* 
   Callgrind:
 
   sudo valgrind --tool=callgrind ./etherate_mt -I 3 -r
@@ -88,27 +200,23 @@ gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 -
   # or
   callgrind_annotate --auto=yes ./callgrind.out.2974
 
-*/
 
-/*
   Cachegrind:
 
   sudo valgrind --tool=cachegrind --branch-sim=yes ./etherate_mt -I 3 -r
 
   --branch-sim=yes
-  Enables collection of branch instruction and misprediction counts.
+   Enables collection of branch instruction and misprediction counts.
 
   cg_annotate ./cachegrind-out /path/to/tests.cpp
   # or
   sudo kcachegrind cachegrind.out
 
- */
 
-/*
   Perf:
   
   sudo perf stat ./etherate_mt -I 1 -c 1
 
   sudo perf top
 
- */
+*/

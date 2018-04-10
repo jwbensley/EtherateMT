@@ -32,23 +32,6 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
     switch(op) {
 
-        // Enable promiscuous mode on interface
-        case S_O_PROMISC_ADD:
-
-            ;
-            struct packet_mreq packet_mreq;
-            memset(&packet_mreq, 0, sizeof(packet_mreq));
-            packet_mreq.mr_type    = PACKET_MR_PROMISC;
-            packet_mreq.mr_ifindex = thd_opt->if_index;
-            
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, (void *)&packet_mreq, sizeof(packet_mreq));
-
-
-        // Remove promisc mode from interface
-        case S_O_PROMISC_REM:
-
-            ///// TODO    
-
 
         // Bind socket to interface
         case S_O_BIND:
@@ -58,8 +41,8 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
             thd_opt->bind_addr.sll_protocol = htons(ETH_P_ALL);
             thd_opt->bind_addr.sll_ifindex  = thd_opt->if_index;
 
-            return bind(thd_opt->sock_fd, (struct sockaddr *)&thd_opt->bind_addr,
-                                     sizeof(thd_opt->bind_addr));
+            return bind(thd_opt->sock, (struct sockaddr *)&thd_opt->bind_addr,
+                        sizeof(thd_opt->bind_addr));
 
 
         // Set the socket Tx or Rx queue length, the Kernel will double
@@ -67,8 +50,8 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
         case S_O_QLEN:
 
             ;
-            int32_t sock_wmem;
-            int32_t sock_rmem;
+            static int32_t sock_wmem;
+            static int32_t sock_rmem;
 
             if (thd_opt->sk_type == SKT_PACKET_MMAP2) {
               sock_wmem = (thd_opt->block_sz * thd_opt->block_nr);
@@ -93,11 +76,11 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
             if (thd_opt->sk_mode == SKT_TX) {
 
-                int32_t sock_wmem_cur;
+                static int32_t sock_wmem_cur;
                 socklen_t read_len = sizeof(sock_wmem_cur);
 
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur,
-                               &read_len) < 0) {
+                if (getsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
+                               &sock_wmem_cur, &read_len) < 0) {
 
                     perror("Can't get the socket write buffer size");
                     return -1;
@@ -106,28 +89,28 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                 if (sock_wmem_cur < sock_wmem) {
 
                     if (thd_opt->verbose)
-                        printf("%" PRIu32 ":Current socket write buffer size is %" PRIi32
-                               " bytes, desired write buffer size is %" PRIi32 " bytes.\n",
+                        printf("%" PRIu32 ":Current socket write buffer size is %" PRId32
+                               " bytes, desired write buffer size is %" PRId32 " bytes.\n",
                                thd_opt->thd_id, sock_wmem_cur, sock_wmem);
-                        printf("%" PRIu32 ":Trying to increase to %" PRIi32 " bytes...\n",
+                        printf("%" PRIu32 ":Trying to increase to %" PRId32 " bytes...\n",
                                thd_opt->thd_id, sock_wmem);
 
-                    if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
+                    if (setsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
                                    sizeof(sock_wmem)) < 0) {
 
                         perror("Can't set the socket write buffer size");
                         return -1;
                     }
                     
-                    if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_wmem_cur,
-                                   &read_len) < 0) {
+                    if (getsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
+                                   &sock_wmem_cur, &read_len) < 0) {
 
                         perror("Can't get the socket write buffer size");
                         return -1;
                     }
 
 
-                    printf("%" PRIu32 ":Write buffer size set to %" PRIi32 " bytes\n",
+                    printf("%" PRIu32 ":Write buffer size set to %" PRId32 " bytes\n",
                            thd_opt->thd_id, sock_wmem_cur);
 
 
@@ -135,17 +118,17 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
                         if (thd_opt->verbose)
                             printf("%" PRIu32 ":Write buffer still too small!"
-                                   " Trying to force to %" PRIi32 " bytes...\n",
+                                   " Trying to force to %" PRId32 " bytes...\n",
                                    thd_opt->thd_id, sock_wmem);
                         
-                        if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
+                        if (setsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUFFORCE,
                                        &sock_wmem, sizeof(sock_wmem)) < 0) {
 
                             perror("Can't force the socket write buffer size");
                             return -1;
                         }
                         
-                        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF,
+                        if (getsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
                                        &sock_wmem_cur, &read_len) < 0) {
 
                             perror("Can't get the socket write buffer size");
@@ -155,7 +138,7 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                         // When the buffer size is forced the kernel sets a value double
                         // the requested size to allow for accounting/meta data space
                         if (thd_opt->verbose)
-                            printf("%" PRIu32 ":Forced write buffer size is now %" PRIi32 " bytes\n",
+                            printf("%" PRIu32 ":Forced write buffer size is now %" PRId32 " bytes\n",
                                    thd_opt->thd_id, (sock_wmem_cur/2));
 
                         if (sock_wmem_cur < sock_wmem) {
@@ -173,11 +156,11 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
             // Increase the socket read queue size, the same as above for Tx
             } else if (thd_opt->sk_mode == SKT_RX) {
 
-                int32_t sock_rmem_cur;
+                static int32_t sock_rmem_cur;
                 socklen_t read_len = sizeof(sock_rmem_cur);
 
-                if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_RCVBUF, &sock_rmem_cur,
-                               &read_len) < 0) {
+                if (getsockopt(thd_opt->sock, SOL_SOCKET, SO_RCVBUF,
+                               &sock_rmem_cur, &read_len) < 0) {
 
                     perror("Can't get the socket read buffer size");
                     return -1;
@@ -186,28 +169,28 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                 if (sock_rmem_cur < sock_rmem) {
 
                     if (thd_opt->verbose)
-                        printf("%" PRIu32 ":Current socket read buffer size is %" PRIi32
-                               " bytes, desired read buffer size is %" PRIi32 " bytes.\n",
+                        printf("%" PRIu32 ":Current socket read buffer size is %" PRId32
+                               " bytes, desired read buffer size is %" PRId32 " bytes.\n",
                                thd_opt->thd_id, sock_rmem_cur, sock_rmem);
-                        printf("%" PRIu32 ":Trying to increase to %" PRIi32 " bytes...\n",
+                        printf("%" PRIu32 ":Trying to increase to %" PRId32 " bytes...\n",
                                thd_opt->thd_id, sock_rmem);
 
-                    if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem,
-                                   sizeof(sock_rmem)) < 0) {
+                    if (setsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
+                                   &sock_rmem, sizeof(sock_rmem)) < 0) {
 
                         perror("Can't set the socket read buffer size");
                         return -1;
                     }
                     
-                    if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF, &sock_rmem_cur,
-                                   &read_len) < 0) {
+                    if (getsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
+                                   &sock_rmem_cur, &read_len) < 0) {
 
                         perror("Can't get the socket read buffer size");
                         return -1;
                     }
 
 
-                    printf("%" PRIu32 ":Read buffer size set to %" PRIi32 " bytes\n",
+                    printf("%" PRIu32 ":Read buffer size set to %" PRId32 " bytes\n",
                            thd_opt->thd_id, sock_rmem_cur);
 
 
@@ -215,17 +198,17 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
                         if (thd_opt->verbose)
                             printf("%" PRIu32 ":Read buffer still too small!"
-                                   " Trying to force to %" PRIi32 " bytes...\n",
+                                   " Trying to force to %" PRId32 " bytes...\n",
                                    thd_opt->thd_id, sock_rmem);
                         
-                        if (setsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUFFORCE,
+                        if (setsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUFFORCE,
                                        &sock_rmem, sizeof(sock_rmem))<0) {
 
                             perror("Can't force the socket read buffer size");
                             return -1;
                         }
                         
-                        if (getsockopt(thd_opt->sock_fd, SOL_SOCKET, SO_SNDBUF,
+                        if (getsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
                                        &sock_rmem_cur, &read_len) < 0) {
 
                             perror("Can't get the socket read buffer size");
@@ -235,7 +218,7 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                         // When the buffer size is forced the kernel sets a value double
                         // the requested size to allow for accounting/meta data space
                         if (thd_opt->verbose)
-                            printf("%" PRIu32 ":Forced read buffer size is now %" PRIi32 " bytes\n",
+                            printf("%" PRIu32 ":Forced read buffer size is now %" PRId32 " bytes\n",
                                    thd_opt->thd_id, (sock_rmem_cur/2));
 
                         if (sock_rmem_cur < sock_rmem) {
@@ -257,27 +240,22 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
         case S_O_LOSSY:
 
             ;
-            static const int32_t sock_discard = 0;
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_LOSS, (void *)&sock_discard, sizeof(sock_discard));
+            #if !defined(PACKET_LOSS) // Requires Kernel 2.6.31
+            return EXIT_SUCCESS;
+            #else
+            static const int32_t sock_discard = 1;
+            return setsockopt(thd_opt->sock, SOL_PACKET, PACKET_LOSS, &sock_discard, sizeof(sock_discard));
+            #endif
 
 
-        // Set the TPACKET version to 2:
+        // Set the TPACKET version:
         // v2 supports packet level read() and write()
-        case S_O_VER_TP2:
-
-            ;
-            static const int32_t sock_ver2 = TPACKET_V2; ///// This wont exist!
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_VERSION, &sock_ver2, sizeof(sock_ver2));
-
-    
-        // Set the TPACKET version to 3:
         // v3 supports but block level read() and write()
-        case S_O_VER_TP3:
+        case S_O_VER_TP:
 
             ;
-            static const int32_t sock_ver3 = TPACKET_V3; ///// This wont exist!
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_VERSION, &sock_ver3, sizeof(sock_ver3));
-
+            return setsockopt(thd_opt->sock, SOL_PACKET, PACKET_VERSION, &thd_opt->tpacket_ver, sizeof(thd_opt->tpacket_ver));
+            
 
         // Request hardware timestamping
         case S_O_NIC_TS:
@@ -297,29 +275,29 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
             // Set the device/hardware timestamping settings:
             ;
-            struct hwtstamp_config hwconfig;
+            static struct hwtstamp_config hwconfig;
             memset (&hwconfig, 0, sizeof(struct hwtstamp_config));
             hwconfig.tx_type   = HWTSTAMP_TX_OFF;       // Disable all Tx timestamping
             hwconfig.rx_filter = HWTSTAMP_FILTER_NONE;  // Filter all Rx timestamping
 
-            struct ifreq ifr;
+            static struct ifreq ifr;
             memset (&ifr, 0, sizeof(struct ifreq));
             strncpy (ifr.ifr_name, (char*)thd_opt->if_name, IF_NAMESIZE);
             ifr.ifr_data = (void *) &hwconfig;
 
-            return ioctl(thd_opt->sock_fd, SIOCSHWTSTAMP, &ifr);
+            return ioctl(thd_opt->sock, SIOCSHWTSTAMP, &ifr);
 
 
         // Set socket timestamping settings
         case S_O_TS:
 
             ;
-            int32_t timesource = 0;
+            static int32_t timesource = 0;
             timesource |= SOF_TIMESTAMPING_RX_HARDWARE;    // Set Rx timestamps to hardware
             timesource |= SOF_TIMESTAMPING_RAW_HARDWARE;   // Use hardware time stamps for reporting
             //timesource |= SOF_TIMESTAMPING_SYS_HARDWARE; // deprecated
 
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_TIMESTAMP, &timesource, sizeof(timesource));
+            return setsockopt(thd_opt->sock, SOL_PACKET, PACKET_TIMESTAMP, &timesource, sizeof(timesource));
 
 
         // Bypass the kernel qdisc layer and push packets directly to the driver,
@@ -332,26 +310,26 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
                 return EXIT_SUCCESS;
             #else
                 static const int32_t sock_qdisc_bypass = 1;
-                return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
+                return setsockopt(thd_opt->sock, SOL_PACKET, PACKET_QDISC_BYPASS, &sock_qdisc_bypass, sizeof(sock_qdisc_bypass));
             #endif
             
 
         // Define a TPACKET v2 Tx/Rx ring buffer
-        case S_O_RING_TP2: ///// Need to break out Tx and Rx ring types
+        case S_O_RING_TP2:
 
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, thd_opt->ring_type, thd_opt->tpacket_req, thd_opt->tpacket_req_sz); ////// Will PACKET_TX/RX_RING exist?
+            return setsockopt(thd_opt->sock, SOL_PACKET, thd_opt->ring_type, thd_opt->tpacket_req, thd_opt->tpacket_req_sz);
 
 
         // Define a TPACKET v3 Tx/Rx ring buffer
-        case S_O_RING_TP3: ///// Need to break out Tx and Rx ring types
+        case S_O_RING_TP3:
 
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, thd_opt->ring_type, thd_opt->tpacket_req3, thd_opt->tpacket_req3_sz); ////// Will PACKET_TX/RX_RING exist?
+            return setsockopt(thd_opt->sock, SOL_PACKET, thd_opt->ring_type, thd_opt->tpacket_req3, thd_opt->tpacket_req3_sz);
 
 
         // mmap() the Tx/Rx ring buffer against the socket, for TPACKET_V2/3
         case S_O_MMAP_TP23:
 
-            thd_opt->mmap_buf = mmap(NULL, (thd_opt->block_sz * thd_opt->block_nr), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED | MAP_POPULATE, thd_opt->sock_fd, 0);
+            thd_opt->mmap_buf = mmap(NULL, (thd_opt->block_sz * thd_opt->block_nr), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED | MAP_POPULATE, thd_opt->sock, 0);
 
             if (thd_opt->mmap_buf == MAP_FAILED) {
                 return -1;
@@ -363,9 +341,10 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
         case S_O_FANOUT:
 
             ;
-            uint16_t fanout_type = PACKET_FANOUT_CPU; 
-            uint32_t fanout_arg = (thd_opt->fanout_grp | (fanout_type << 16));
-            return setsockopt(thd_opt->sock_fd, SOL_PACKET, PACKET_FANOUT, &fanout_arg, sizeof(fanout_arg));
+            static const uint16_t fanout_type = PACKET_FANOUT_CPU;
+            static uint32_t fanout_arg;
+            fanout_arg = (thd_opt->fanout_grp | (fanout_type << 16));
+            return setsockopt(thd_opt->sock, SOL_PACKET, PACKET_FANOUT, &fanout_arg, sizeof(fanout_arg));
 
 
         // Undefined socket operation
