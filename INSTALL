@@ -1,13 +1,13 @@
 /* Perform a "regular" compile */
 
-gcc -o etherate_mt etherate_mt.c -lpthread -O3 --std=c11
+gcc -o build/etherate_mt src/etherate_mt.c -lpthread -O3 --std=c11
 
 
 
 / * Perform a "strict" compile - requires a more recent GCC version,
     to check for various code issues */
 
-gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
+gcc -o build/etherate_mt src/etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
 
 /*
   -lpthread
@@ -130,10 +130,10 @@ gcc -o etherate_mt etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 -
 
 
 
-/* Perform a "debug" compile - use with tools like val/call/cache-grind,
+/* Perform a "debug" compile - use with tools like val-/call-/cache-grind,
    GDB, perf etc */
 
-gcc -o etherate_mt etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c11 -fsanitize=address
+gcc -o build/etherate_mt src/etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c11 -fsanitize=address
 
 /*
 
@@ -167,7 +167,7 @@ gcc -o etherate_mt etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c1
 
   Valgrind:
 
-  sudo valgrind --leak-check=full --show-leak-kinds=all --leak-resolution=high --track-origins=yes --expensive-definedness-checks=yes --track-fds=yes ./etherate_mt -I 3 -r
+  sudo valgrind --leak-check=full --show-leak-kinds=all --leak-resolution=high --track-origins=yes --expensive-definedness-checks=yes --track-fds=yes ./build/etherate_mt -I 3 -r
 
   --leak-check=full
    When enabled, search for memory leaks when the client program finishes.
@@ -194,7 +194,7 @@ gcc -o etherate_mt etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c1
 
   Callgrind:
 
-  sudo valgrind --tool=callgrind ./etherate_mt -I 3 -r
+  sudo valgrind --tool=callgrind ./build/etherate_mt -I 3 -r
 
   callgrind_annotate ./callgrind.out.2974 /path/to/tests.cpp
   # or
@@ -203,7 +203,7 @@ gcc -o etherate_mt etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c1
 
   Cachegrind:
 
-  sudo valgrind --tool=cachegrind --branch-sim=yes ./etherate_mt -I 3 -r
+  sudo valgrind --tool=cachegrind --branch-sim=yes ./build/etherate_mt -I 3 -r
 
   --branch-sim=yes
    Enables collection of branch instruction and misprediction counts.
@@ -215,7 +215,7 @@ gcc -o etherate_mt etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c1
 
   Perf:
   
-  sudo perf stat ./etherate_mt -I 1 -c 1
+  sudo perf stat ./buid/etherate_mt -I 1 -c 1
 
   sudo perf top
 

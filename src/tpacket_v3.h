@@ -25,6 +25,9 @@
 
 
 
+#ifndef _TPACKET_V3_H_
+#define _TPACKET_V3_H_
+
 // Worker thread entry function
 void *tpacket_v3_init(void* thd_opt_p);
 
@@ -51,4 +54,6 @@ struct block_desc {
     uint32_t version;
     uint32_t offset_to_priv;
     struct   tpacket_hdr_v1 h1;
-}; ///// Can this be removed or renamed
+}; ///// Can this be removed or renamed?
+
+#endif // _TPACKET_V3_H_

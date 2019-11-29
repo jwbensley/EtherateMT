@@ -24,6 +24,10 @@
  */
 
 
+
+#ifndef _FUNCTIONS_H_
+#define _FUNCTIONS_H_
+
 // Process CLI args
 uint8_t cli_args(int argc, char *argv[], struct etherate *eth);
 
@@ -42,7 +46,7 @@ void get_if_list();
 // Copy interface name from interface index number into char*
 void get_if_name_by_index(int32_t if_index, uint8_t* if_name);
 
-// Print CLI usage/args
+// Print CLI args and usage
 void print_usage();
 
 // Remove the interface from promiscuous mode
@@ -62,3 +66,5 @@ void thread_init(struct etherate *eth, uint16_t thread);
 
 // Print a custom message with the errno text and thread ID of the calling thread
 void tperror(struct thd_opt *thd_opt, const char *msg);
+
+#endif // _FUNCTIONS_H_

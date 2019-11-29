@@ -25,19 +25,36 @@
 
 
 
-#ifndef _PACKET_H_
-#define _PACKET_H_
+#include "threads.h"
 
-// Worker thread entry function
-static void *packet_init(void* thd_opt_p);
 
-// Return socket FD for a non Tx/Rx ring socket
-static int32_t packet_sock(struct thd_opt *thd_opt);
 
-// Rx thread loop using read()
-static void packet_rx(struct thd_opt *thd_opt);
+static int32_t spawn_stats_thd(struct etherate *eth) {
 
-// Tx thread loop using sendto()
-static void packet_tx(struct thd_opt *thd_opt);
+    if (pthread_attr_init(&eth->app_opt.thd_attr[eth->app_opt.thd_nr]) != 0) {
+        perror("Can't init stats thread attrs");
+        return(EXIT_FAILURE);
+    }
+    if (pthread_attr_setdetachstate(&eth->app_opt.thd_attr[eth->app_opt.thd_nr], PTHREAD_CREATE_JOINABLE) != 0) {
+        perror("Can't set stats thread detach state");
+        return(EXIT_FAILURE);
+    }
+    if (pthread_create(&eth->app_opt.thd[eth->app_opt.thd_nr], &eth->app_opt.thd_attr[eth->app_opt.thd_nr], print_stats, (void*)&eth) != 0) {
+        perror("Can't create stats thread");
+        return(EXIT_FAILURE);
+    }
+    if (pthread_attr_destroy(&eth->app_opt.thd_attr[eth->app_opt.thd_nr]) != 0) {
+        perror("Can't remove stats thread attributes");
+        return(EXIT_FAILURE);
+    }
+    return EXIT_SUCCESS;
 
-#endif // _PACKET_H_
+}
+
+
+
+static void thd_init(struct etherate *eth) {
+    // thd_nr+1 to include the worker threads + stats printing thread:
+    eth->app_opt.thd = calloc(sizeof(pthread_t), (eth->app_opt.thd_nr + 1));
+    eth->app_opt.thd_attr = calloc(sizeof(pthread_attr_t), (eth->app_opt.thd_nr + 1));
+}

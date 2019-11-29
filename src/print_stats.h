@@ -25,5 +25,10 @@
 
 
 
+#ifndef _PRINT_STATS_H_
+#define _PRINT_STATS_H_
+
 // Aggregate per-thread stats and print every second
-void *print_pps(void *etherate_p);
+static void *print_pps(void *etherate_p);
+
+#endif // _PRINT_STATS_H_

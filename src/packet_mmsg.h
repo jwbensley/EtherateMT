@@ -25,6 +25,9 @@
 
 
 
+#ifndef _PACKET_MMSG_H_
+#define _PACKET_MMSG_H_
+
 // Worker thread entry function
 void *mmsg_init(void* thd_opt_p);
 
@@ -36,3 +39,5 @@ int32_t mmsg_sock(struct thd_opt *thd_opt);
 
 // Tx thread loop using sendmmsg()
 void mmsg_tx(struct thd_opt *thd_opt);
+
+#endif // _PACKET_MMSG_H_

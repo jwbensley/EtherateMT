@@ -25,6 +25,9 @@
 
 
 
+#ifndef _SOCK_OP_H_
+#define _SOCK_OP_H_
+
 #define S_O_PROMISC_ADD 1
 #define S_O_PROMISC_REM 2
 #define S_O_BIND        3
@@ -43,3 +46,5 @@
 
 // Configure a socket option against thd_opt->sock_fd
 int32_t sock_op(uint8_t op, struct thd_opt *thd_opt);
+
+#endif // _SOCK_OP_H_

@@ -25,12 +25,13 @@
 
 
 
-#ifndef _TPACKET_V3_BYPASS_H_
-#define _TPACKET_V3_BYPASS_H_
+#ifndef _THREADS_H_
+#define _THREADS_H_
 
-// Fake function calls
-void *tpacket_v3_init();
+// Spawn the stats printing thread
+static int32_t spawn_stats_thd(struct etherate *eth);
 
-void tpacket_v3_stats();
+// Init thread controls
+static void thd_init(struct etherate *eth);
 
-#endif // _TPACKET_V3_BYPASS_H_
+#endif // _THREADS_H_

@@ -24,6 +24,10 @@
  */
 
 
+
+#ifndef _TPACKET_V2_H_
+#define _TPACKET_V2_H_
+
 // Worker thread entry function
 void *tpacket_v2_init(void* thd_opt_p);
 
@@ -44,3 +48,5 @@ void tpacket_v2_stats(struct thd_opt *thd_opt, uint64_t *rx_drops);
 
 // PACKET_MMAP Tx thread loop
 void tpacket_v2_tx(struct thd_opt *thd_opt);
+
+#endif // _TPACKET_V2_H_
