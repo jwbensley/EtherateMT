@@ -25,6 +25,9 @@
 
 
 
+#ifndef _ETHERATE_MT_H_
+#define _ETHERATE_MT_H_
+
 #define _GNU_SOURCE           // Required for pthread_attr_setaffinity_np()
 #include <errno.h>            // errno
 #include <net/ethernet.h>     // ETH_P_ALL
@@ -92,7 +95,7 @@ struct app_opt {
     pthread_t      *thd;
     uint8_t        thd_affin; ///// Add CLI arg, try to avoid split NUMA node?
     pthread_attr_t *thd_attr;
-    uint16_t       thd_nr;
+    uint16_t       thd_nr;     // Number of worker threads
     uint8_t        verbose;
 };
 
@@ -164,3 +167,5 @@ struct etherate {
 };
 
 struct etherate *eth_p;
+
+#endif // _ETHERATE_MT_H_

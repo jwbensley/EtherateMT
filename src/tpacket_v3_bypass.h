@@ -25,7 +25,12 @@
 
 
 
+#ifndef _TPACKET_V3_BYPASS_H_
+#define _TPACKET_V3_BYPASS_H_
+
 // Fake function calls
 void *tpacket_v3_init();
 
 void tpacket_v3_stats();
+
+#endif // _TPACKET_V3_BYPASS_H_

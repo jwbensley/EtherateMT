@@ -25,6 +25,9 @@
 
 
 
+#ifndef _PACKET_MSG_H_
+#define _PACKET_MSG_H_
+
 // Worker thread entry function
 void *msg_init(void* thd_opt_p);
 
@@ -36,3 +39,5 @@ void msg_rx(struct thd_opt *thd_opt);
 
 // Tx thread loop using sendmsg()
 void msg_tx(struct thd_opt *thd_opt);
+
+#endif // _PACKET_MSG_H_

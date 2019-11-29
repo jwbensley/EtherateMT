@@ -47,6 +47,7 @@
 #endif
 
 #include "print_stats.c"
+#include "threads.c"
 
 
 
@@ -135,27 +136,12 @@ int main(int argc, char *argv[]) {
     }
 
 
-    // Set up thread controls
-    // thd_nr+1 for the stats thread:
-    eth.app_opt.thd = calloc(sizeof(pthread_t), (eth.app_opt.thd_nr + 1));
-    eth.app_opt.thd_attr = calloc(sizeof(pthread_attr_t), (eth.app_opt.thd_nr + 1));
 
-    // Spawn a stats printing thread
-    if (pthread_attr_init(&eth.app_opt.thd_attr[eth.app_opt.thd_nr]) != 0) {
-        perror("Can't init stats thread attrs");
-        exit(EXIT_SUCCESS);
-    }
-    if (pthread_attr_setdetachstate(&eth.app_opt.thd_attr[eth.app_opt.thd_nr], PTHREAD_CREATE_JOINABLE) != 0) {
-        perror("Can't set stats thread detach state");
-        exit(EXIT_SUCCESS);
-    }
-    if (pthread_create(&eth.app_opt.thd[eth.app_opt.thd_nr], &eth.app_opt.thd_attr[eth.app_opt.thd_nr], print_stats, (void*)&eth) != 0) {
-        perror("Can't create stats thread");
-        exit(EXIT_FAILURE);
-    }
-    if (pthread_attr_destroy(&eth.app_opt.thd_attr[eth.app_opt.thd_nr]) != 0) {
-        perror("Can't remove stats thread attributes");
-    }
+
+    // Spawn the stats printing thread
+    thd_init(&eth);
+    if (spawn_stats_thd(&eth) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
 
 
     // Create a copy of the program settings for each worker thread
