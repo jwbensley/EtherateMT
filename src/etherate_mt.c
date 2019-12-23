@@ -26,8 +26,11 @@
 
 
 #include "etherate_mt.h"
+#include "threads.h"
+
 #include "functions.c"
 #include "sock_op.c"
+
 #include "packet.c"
 #include "packet_msg.c"
 #include "packet_mmsg.c"
@@ -48,6 +51,7 @@
 
 #include "print_stats.c"
 #include "threads.c"
+
 
 
 
@@ -136,9 +140,9 @@ int main(int argc, char *argv[]) {
     }
 
 
+    thd_alloc(&eth);
     // Spawn the stats printing thread
-    thd_init(&eth);
-    if (spawn_stats_thd(&eth) != EXIT_SUCCESS)
+    if (thd_init_stats(&eth) != EXIT_SUCCESS)
         return EXIT_FAILURE;
 
 
@@ -164,8 +168,8 @@ int main(int argc, char *argv[]) {
         pthread_attr_setschedparam(&t_attr_fill,&para_fill);
         */
 
-        // Setup and copy default per-thread settings
-        thread_init(&eth, thread);
+        // Setup and copy default per-thread structures
+        thd_setup(&eth, thread);
 
         ///// Perhaps get the thread to set its own affinity first before it does anything else?
         if (eth.app_opt.thd_affin) {
@@ -193,33 +197,8 @@ int main(int argc, char *argv[]) {
 
         }
 
-        int32_t thd_ret = 0;
-
-        if (eth.app_opt.sk_type == SKT_PACKET_MMAP2) {
-            thd_ret = pthread_create(&eth.app_opt.thd[thread], &eth.app_opt.thd_attr[thread], tpacket_v2_init, (void*)&eth.thd_opt[thread]);
-
-        } else if (eth.app_opt.sk_type == SKT_PACKET) {
-            thd_ret = pthread_create(&eth.app_opt.thd[thread], &eth.app_opt.thd_attr[thread], packet_init, (void*)&eth.thd_opt[thread]);
-
-        } else if (eth.app_opt.sk_type == SKT_SENDMSG) {
-            thd_ret = pthread_create(&eth.app_opt.thd[thread], &eth.app_opt.thd_attr[thread], msg_init, (void*)&eth.thd_opt[thread]);
-
-        } else if (eth.app_opt.sk_type == SKT_SENDMMSG) {
-            thd_ret = pthread_create(&eth.app_opt.thd[thread], &eth.app_opt.thd_attr[thread], mmsg_init, (void*)&eth.thd_opt[thread]);
-
-        } else if (eth.app_opt.sk_type == SKT_PACKET_MMAP3) {
-            thd_ret = pthread_create(&eth.app_opt.thd[thread], &eth.app_opt.thd_attr[thread], tpacket_v3_init, (void*)&eth.thd_opt[thread]);
-
-        }
-
-        if (thd_ret != 0) {
-            perror("Can't create worker thread");
-            exit(EXIT_FAILURE);
-        }
-
-        if (pthread_attr_destroy(&eth.app_opt.thd_attr[thread]) != 0) {
-            perror("Can't remove worker thread attributes");
-        }
+        if (thd_init_worker(&eth, thread) != EXIT_SUCCESS)
+            return EXIT_FAILURE;
 
     }
 
@@ -243,7 +222,7 @@ int main(int argc, char *argv[]) {
             eth.thd_opt[thread].quit = 1;
         }
 
-        thread_cleanup(&eth.thd_opt[thread]);
+        thd_cleanup(&eth.thd_opt[thread]);
 
     }
 

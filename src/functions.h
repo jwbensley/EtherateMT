@@ -58,13 +58,4 @@ int16_t set_int_promisc(struct etherate *eth);
 // Signal handler to clean up threads
 void signal_handler(int signal);
 
-// Worker thread cleanup
-void thread_cleanup(void *thd_opt_p);
-
-// Set the default settings for a worker thread
-void thread_init(struct etherate *eth, uint16_t thread);
-
-// Print a custom message with the errno text and thread ID of the calling thread
-void tperror(struct thd_opt *thd_opt, const char *msg);
-
 #endif // _FUNCTIONS_H_

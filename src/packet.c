@@ -40,7 +40,7 @@ void *packet_init(void* thd_opt_p) {
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
 
 
     if (thd_opt->verbose)

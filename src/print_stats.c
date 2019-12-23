@@ -58,9 +58,10 @@ void *print_stats(void *etherate_p) {
     while (waiting) {
         for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread++) {
             if (eth->thd_opt[thread].started == 1) waiting = 0;
-            if (eth->thd_opt[thread].quit == 1) pthread_exit((void*)EXIT_SUCCESS);
+            /////if (eth->thd_opt[thread].quit == 1) pthread_exit((void*)EXIT_SUCCESS);
         }
     }
+
 
     // Wait for 1 second otherwise the first stats print will be all-zeros.
     sleep(1);
