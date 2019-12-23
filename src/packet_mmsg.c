@@ -42,7 +42,7 @@ void *mmsg_init(void* thd_opt_p) {
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
     
 
     if (thd_opt->verbose)
@@ -207,7 +207,7 @@ void mmsg_tx(struct thd_opt *thd_opt) {
 
     while (1) {
 
-        tx_frames = sendmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
+        tx_frames = sendmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0);
 
         if (tx_frames == -1) {
             tperror(thd_opt, "Socket Tx error");

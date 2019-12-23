@@ -42,7 +42,7 @@ void *tpacket_v2_init(void* thd_opt_p) {
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
 
     
     if (thd_opt->verbose)
@@ -482,14 +482,17 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
             if (errno != ENOBUFS) {
                 tperror(thd_opt, "PACKET_MMAP Tx error");
                 pthread_exit((void*)EXIT_FAILURE);
-            } else {
+                ///// ^ Do we want to quit on error or keep going?
+            }/* else {
                 thd_opt->stalling = 1;
-            }
+            }*/
         
         }
  
         thd_opt->tx_frms  += (tx_bytes / thd_opt->frame_sz);
         thd_opt->tx_bytes += tx_bytes;
+        /////thd_opt->tx_frms  += thd_opt->frame_nr;
+        /////thd_opt->tx_bytes += (thd_opt->frame_nr * tx_bytes);
  
     }
 

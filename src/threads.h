@@ -28,10 +28,22 @@
 #ifndef _THREADS_H_
 #define _THREADS_H_
 
-// Spawn the stats printing thread
-static int32_t spawn_stats_thd(struct etherate *eth);
+// Alloc thread controls for all threads
+static void thd_alloc(struct etherate *eth);
 
-// Init thread controls
-static void thd_init(struct etherate *eth);
+// Butch: "Thread's dead baby, Thread's dead"
+static void thd_cleanup(void *thd_opt_p);
+
+// Spawn the stats printing thread
+static int32_t thd_init_stats(struct etherate *eth);
+
+// Spawn a worker thread
+static int32_t thd_init_worker(struct etherate *eth, uint16_t thread);
+
+// Copy settings into a new worker thread
+static void thd_setup(struct etherate *eth, uint16_t thread);
+
+// Print a custom message with the errno text and thread ID of the calling thread
+static void tperror(struct thd_opt *thd_opt, const char *msg);
 
 #endif // _THREADS_H_
