@@ -48,6 +48,7 @@
 #include <stdlib.h>           // calloc(), exit(), EXIT_FAILURE, EXIT_SUCCESS, rand(), RAND_MAX, strtoul()
 #include <stdio.h>            // FILE, fclose(), fopen(), fscanf(), perror(), printf()
 #include <string.h>           // memcpy(), memset(), strncpy()
+#include <sys/random.h>       // getrandom()
 #include <sys/syscall.h>      // SYS_gettid
 #include "sysexits.h"         // EX_NOPERM, EX_PROTOCOL, EX_SOFTWARE
 #include <unistd.h>           // getpagesize(), getpid(), getuid(), read(), sleep()
