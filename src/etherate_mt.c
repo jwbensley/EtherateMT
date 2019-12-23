@@ -128,14 +128,12 @@ int main(int argc, char *argv[]) {
 
     
     // Fill the test frame buffer with random data
-    if (eth.frm_opt.custom_frame == 0) {
-        for (uint16_t i = 0; i < eth.frm_opt.frame_sz; i += 1)
-        {
-            eth.frm_opt.tx_buffer[i] = (uint8_t)((255.0*rand()/(RAND_MAX+1.0)));
-        }
+    if (getrandom(eth.frm_opt.tx_buffer, eth.frm_opt.frame_sz, 0)
+        != eth.frm_opt.frame_sz)
+    {
+        perror("Can't generate random frame data");
+        exit(EXIT_FAILURE);
     }
-
-
 
 
     // Spawn the stats printing thread
