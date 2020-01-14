@@ -52,7 +52,6 @@ void *print_stats(void *etherate_p) {
     double   rx_gbps           = 0;
     double   tx_gbps           = 0;
 
-
     // Wait for one of the Tx/Rx threads to start
     uint8_t waiting = 1;
     while (waiting) {
@@ -87,7 +86,6 @@ void *print_stats(void *etherate_p) {
             tx_bytes_now += eth->thd_opt[thread].tx_bytes;
             tx_frms_now  += eth->thd_opt[thread].tx_frms;
 
-
             if (eth->thd_opt[thread].stalling) {
                 printf("%" PRIu32 ":Socket is stalling!\n", eth->thd_opt[thread].thd_id);
                 eth->thd_opt[thread].stalling = 0;
@@ -115,14 +113,15 @@ void *print_stats(void *etherate_p) {
 
 
         rx_bytes = rx_bytes_now - rx_bytes_previous;
-        rx_drops = rx_drops;
-        rx_qfrz  = rx_qfrz;
+        rx_drops = rx_drops;   //// ????
+        rx_qfrz  = rx_qfrz;    //// ????
         rx_pps   = rx_frms_now  - rx_frms_previous;
         tx_bytes = tx_bytes_now - tx_bytes_previous;
         tx_pps   = tx_frms_now  - tx_frms_previous;
 
         rx_gbps = ((double)(rx_bytes*8)/1000/1000/1000);
         tx_gbps = ((double)(tx_bytes*8)/1000/1000/1000);
+
 
         if(eth->app_opt.verbose) {
             printf("%" PRIu64 ".\tRx: %.2f Gbps (%" PRIu64 " fps) %lu Drops %lu Q-Freeze\tTx: %.2f Gbps (%" PRIu64 " fps)\n",
