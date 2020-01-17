@@ -139,6 +139,7 @@ struct thd_opt {
     uint8_t  *rx_buffer;
     uint64_t rx_bytes;
     uint64_t rx_frms;
+    uint64_t sk_err;          // Number of send/receive syscall errors
     uint8_t  sk_mode;         // Tx/Rx/Bidi
     uint8_t  sk_type;         // PACKET_MMAP, send(), sendmmsg() etc.
     int32_t  sock;            // Socket file descriptor
