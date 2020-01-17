@@ -185,6 +185,7 @@ static void thd_setup(struct etherate *eth, uint16_t thread) {
     eth->thd_opt[thread].rx_bytes        = 0;
     eth->thd_opt[thread].rx_frms         = 0;
     eth->thd_opt[thread].started         = 0;
+    eth->thd_opt[thread].sk_err          = 0;
     eth->thd_opt[thread].sk_mode         = eth->app_opt.sk_mode;
     eth->thd_opt[thread].sk_type         = eth->app_opt.sk_type;
     eth->thd_opt[thread].thd_nr          = eth->app_opt.thd_nr;

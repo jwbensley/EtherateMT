@@ -453,7 +453,7 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
     struct tpacket2_hdr *hdr;
     uint8_t *data;
     uint32_t i;
-    int64_t tx_bytes = 0;
+    int64_t ret = 0;
     thd_opt->started = 1;
 
 
@@ -474,63 +474,43 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
 
         /*
          When using MSG_DONTWAIT as follows:
-           tx_bytes = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
+           ret = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
           The sendto() call returns if it would block, i.e. if we are running
           at line rate. There is no benefit to returning because we're in an
           infinite loop calling sendto(), so we just call it again, context
           switching between kernel and user space all the time. So this flag is
           not used.
          */
-        tx_bytes = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
+        ret = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
 
 
         /*
          When evaluating the return value of sendto(), after a successful call
-         the number of bytes transmitted is returned. However if any one of the
-         frames in the TX ring failed to transmit (even though some or even all
-         except one may have been successful) the return code for the
-         transmition of this entire ring buffer is altered is set to an error
+         the number of bytes transmitted is returned. However, if any one of
+         the frames in the TX ring failed to transmit (even though some or even
+         all except one may have been successful) the return code for the
+         transmission of this entire ring buffer is set to an error
          code, which means the return value can't be relied upon to get the
-         number of bytes transmitter (this is by design for AF_PACKET rings).
+         number of bytes transmitted (this is by design for AF_PACKET rings).
 
          Instead we must check the return code from sendto() for errors, and
          then walk the TX ring and check that status flag of each packet in the
          ring to see if it was transmitted.
         */
-        if (tx_bytes == 0) {
+        if (ret == 0) {
             printf("tx_bytes == 0\n");
 
-        } else if (tx_bytes == EMSGSIZE || tx_bytes == -EMSGSIZE) {
-            printf("tx_bytes == EMSGSIZE (%ld)\n", tx_bytes);
-
-        } else if (tx_bytes == ENOBUFS) {
-            thd_opt->stalling = 1;
-
-        } else if (tx_bytes == EINVAL || tx_bytes == -EINVAL) {
-            printf("tx_bytes == EINVAL (%ld)\n", tx_bytes);
-
-        } else if (tx_bytes == ENETDOWN || tx_bytes == -ENETDOWN) {
-            printf("tx_bytes == ENETDOWN (%ld)\n", tx_bytes);
-            pthread_exit((void*)EXIT_FAILURE);
-
-        } else if (tx_bytes == -1) {
-            //printf("tx_bytes == -1\n");
-
-        } else if (tx_bytes < 0) {
-            printf("tx_bytes < 0 (%ld)\n", tx_bytes);
-            ///tperror(thd_opt, "PACKET_MMAP Tx error");
-            /////pthread_exit((void*)EXIT_FAILURE);
+        } else if (ret == -1) {
+            //thd_opt->stalling = 1;
+            //tperror(thd_opt, "Tx send() error");
+            thd_opt->sk_err += 1;
         }
 
-        /*
-        thd_opt->tx_frms  += (tx_bytes / thd_opt->frame_sz);
-        thd_opt->tx_bytes += tx_bytes;
-        */
         for (i = 0; i < thd_opt->frame_nr; i += 1) {
             hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
             if (hdr->tp_status == TP_STATUS_AVAILABLE) {
-                    thd_opt->tx_frms += 1;
-                    thd_opt->tx_bytes += thd_opt->frame_sz;
+                thd_opt->tx_frms += 1;
+                thd_opt->tx_bytes += thd_opt->frame_sz;
             }
             
         }
