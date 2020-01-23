@@ -273,8 +273,10 @@ void tpacket_v2_rx(struct thd_opt *thd_opt) {
     while(1) {
 
         if (poll(&pfd, 1, -1) == -1) {
-            tperror(thd_opt, "Rx poll error");
+            tperror(thd_opt, "Rx poll() error");
             pthread_exit((void*)EXIT_FAILURE);
+            ///// TODO
+            //thd_opt->sk_err += 1;
         }
 
         if (pfd.revents != POLLIN)
@@ -474,33 +476,36 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
 
         /*
          When using MSG_DONTWAIT as follows:
-           ret = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
+          ret = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
           The sendto() call returns if it would block, i.e. if we are running
           at line rate. There is no benefit to returning because we're in an
-          infinite loop calling sendto(), so we just call it again, context
+          infinite loop calling sendto(), so we'd just call it again, context
           switching between kernel and user space all the time. So this flag is
-          not used.
+          not used here.
+
+          Also note that below the following could be used:
+          ret = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
+          Both send() and sendto() ultimately call __sys_sendto()
          */
-        ret = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
+        ret = send(thd_opt->sock, NULL, 0, 0);
 
 
         /*
          When evaluating the return value of sendto(), after a successful call
-         the number of bytes transmitted is returned. However, if any one of
-         the frames in the TX ring failed to transmit (even though some or even
-         all except one may have been successful) the return code for the
-         transmission of this entire ring buffer is set to an error
-         code, which means the return value can't be relied upon to get the
+         the number of bytes transmitted is returned or -1 on error and errno
+         is set.
+         However, when transmitting a ring of packets, if any one of the frames 
+         in the TX ring failed to transmit (even though some or even all except
+         one may have been successful) the return code for the
+         transmission of this >entire ring buffer< is set to -1 and errno is
+         set, which means the return value can't be relied upon to get the
          number of bytes transmitted (this is by design for AF_PACKET rings).
 
-         Instead we must check the return code from sendto() for errors, and
+         Instead we must check the return code from sendto() for -1, and
          then walk the TX ring and check that status flag of each packet in the
          ring to see if it was transmitted.
         */
-        if (ret == 0) {
-            printf("tx_bytes == 0\n");
-
-        } else if (ret == -1) {
+        if (ret == -1) {
             //thd_opt->stalling = 1;
             //tperror(thd_opt, "Tx send() error");
             thd_opt->sk_err += 1;
