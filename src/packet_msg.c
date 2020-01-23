@@ -95,12 +95,13 @@ void msg_rx(struct thd_opt *thd_opt) {
         rx_bytes = recvmsg(thd_opt->sock, &msg_hdr, 0);
         
         if (rx_bytes == -1) {
-            tperror(thd_opt, "Socket Rx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            //tperror(thd_opt, "Socket Rx error");
+            //pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->rx_bytes += rx_bytes;
+            thd_opt->rx_frms += 1;            
         }
-
-        thd_opt->rx_bytes += rx_bytes;
-        thd_opt->rx_frms += 1;
 
     }
 
@@ -193,12 +194,14 @@ void msg_tx(struct thd_opt *thd_opt) {
         tx_bytes = sendmsg(thd_opt->sock, &msg_hdr, 0);
 
         if (tx_bytes == -1) {
-            tperror(thd_opt, "Socket Tx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            //tperror(thd_opt, "Tx sendmsg() error");
+            //pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->tx_bytes += tx_bytes;
+            thd_opt->tx_frms += 1;
         }
 
-        thd_opt->tx_bytes += tx_bytes;
-        thd_opt->tx_frms += 1;
     }
 
 }
