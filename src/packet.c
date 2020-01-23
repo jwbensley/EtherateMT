@@ -140,8 +140,9 @@ void packet_rx(struct thd_opt *thd_opt) {
         rx_bytes = read(thd_opt->sock, thd_opt->rx_buffer, DEF_FRM_SZ_MAX);
         
         if (rx_bytes == -1) {
-            tperror(thd_opt, "Socket Rx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            //tperror(thd_opt, "Rx read() error");
+            //pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
         }
 
         thd_opt->rx_bytes += rx_bytes;
@@ -161,17 +162,18 @@ void packet_tx(struct thd_opt *thd_opt) {
 
     while(1) {
    
-        // send() is a just a little faster than sendto()
         tx_bytes = send(thd_opt->sock, thd_opt->tx_buffer,
                         thd_opt->frame_sz, 0);        
 
         if (tx_bytes == -1) {
-            tperror(thd_opt, "Socket Tx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            //tperror(thd_opt, "Tx send() error");
+            //pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->tx_bytes += tx_bytes;
+            thd_opt->tx_frms += 1;
         }
 
-        thd_opt->tx_bytes += tx_bytes;
-        thd_opt->tx_frms += 1;
 
     }
 
