@@ -273,10 +273,10 @@ void tpacket_v2_rx(struct thd_opt *thd_opt) {
     while(1) {
 
         if (poll(&pfd, 1, -1) == -1) {
-            tperror(thd_opt, "Rx poll() error");
-            pthread_exit((void*)EXIT_FAILURE);
             ///// TODO
-            //thd_opt->sk_err += 1;
+            /////tperror(thd_opt, "Rx poll() error");
+            ////pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
         }
 
         if (pfd.revents != POLLIN)
@@ -456,6 +456,7 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
     uint8_t *data;
     uint32_t i;
     int64_t ret = 0;
+
     thd_opt->started = 1;
 
 
@@ -491,9 +492,9 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
 
 
         /*
-         When evaluating the return value of sendto(), after a successful call
-         the number of bytes transmitted is returned or -1 on error and errno
-         is set.
+         When evaluating the return value of send() or sendto(), after a
+         successful call the number of bytes transmitted is returned or -1 on
+         error and errno is set.
          However, when transmitting a ring of packets, if any one of the frames 
          in the TX ring failed to transmit (even though some or even all except
          one may have been successful) the return code for the
@@ -506,8 +507,6 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
          ring to see if it was transmitted.
         */
         if (ret == -1) {
-            //thd_opt->stalling = 1;
-            //tperror(thd_opt, "Tx send() error");
             thd_opt->sk_err += 1;
         }
 

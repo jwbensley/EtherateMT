@@ -96,8 +96,7 @@ void mmsg_rx(struct thd_opt *thd_opt) {
         rx_frames = recvmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL);
         
         if (rx_frames == -1) {
-            tperror(thd_opt, "Socket Rx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
         }
 
         for (int i = 0; i < rx_frames; i++) {
@@ -207,15 +206,25 @@ void mmsg_tx(struct thd_opt *thd_opt) {
 
     while (1) {
 
+        /*
+         When using sendmmsg to send a batch of frames, unlike PACKET_MMAP, an
+         error is only returned if no datagrams were sent, rather than the
+         PACKET_MMAP approach to return an error if any one frame failed to
+         send.
+
+         sendmmsg() returns the number of frames sent or -1 and sets errno if
+         0 frames were sent.
+        */
+
         tx_frames = sendmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0);
 
         if (tx_frames == -1) {
-            tperror(thd_opt, "Socket Tx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->tx_bytes += (tx_frames * thd_opt->frame_sz);
+            thd_opt->tx_frms += tx_frames;
         }
 
-        thd_opt->tx_bytes += (tx_frames * thd_opt->frame_sz);
-        thd_opt->tx_frms += tx_frames;
     }
 
 }
