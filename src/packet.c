@@ -30,7 +30,7 @@
 void *packet_init(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
-
+    
 
     // Save the thread tid
     pid_t thread_id;
@@ -133,6 +133,7 @@ void *packet_init(void* thd_opt_p) {
 void packet_rx(struct thd_opt *thd_opt) {
 
     int32_t rx_bytes;
+    
     thd_opt->started = 1;
 
     while(1) {
@@ -140,8 +141,6 @@ void packet_rx(struct thd_opt *thd_opt) {
         rx_bytes = read(thd_opt->sock, thd_opt->rx_buffer, DEF_FRM_SZ_MAX);
         
         if (rx_bytes == -1) {
-            //tperror(thd_opt, "Rx read() error");
-            //pthread_exit((void*)EXIT_FAILURE);
             thd_opt->sk_err += 1;
         }
 
@@ -156,8 +155,8 @@ void packet_rx(struct thd_opt *thd_opt) {
 
 void packet_tx(struct thd_opt *thd_opt) {
 
-
     int32_t tx_bytes;
+
     thd_opt->started = 1;
 
     while(1) {
@@ -166,8 +165,6 @@ void packet_tx(struct thd_opt *thd_opt) {
                         thd_opt->frame_sz, 0);        
 
         if (tx_bytes == -1) {
-            //tperror(thd_opt, "Tx send() error");
-            //pthread_exit((void*)EXIT_FAILURE);
             thd_opt->sk_err += 1;
         } else {
             thd_opt->tx_bytes += tx_bytes;
