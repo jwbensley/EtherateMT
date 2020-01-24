@@ -291,8 +291,10 @@ void tpacket_v3_rx(struct thd_opt *thd_opt) {
             int32_t poll_ret = poll(&pfd, 1, -1);
 
             if (poll_ret == -1) {
-                tperror(thd_opt, "Rx poll error");
-                pthread_exit((void*)EXIT_FAILURE);
+                ///// TODO
+                /////tperror(thd_opt, "Rx poll error");
+                /////pthread_exit((void*)EXIT_FAILURE);
+                thd_opt->sk_err += 1;
             }
 
             if (pfd.revents != POLLIN)
@@ -484,8 +486,9 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
     struct tpacket3_hdr *hdr;
     uint8_t *data;
     uint32_t i;
-    int64_t tx_bytes = 0;
+    int64_t ret = 0;
     
+    thd_opt->started = 1;
 
     /*
     TPACKET_V2 --> TPACKET_V3:
@@ -506,7 +509,6 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
           Packets with non-zero values of tp_next_offset will be dropped.
     */
 
-    thd_opt->started = 1;
     
     while(1) {
 
@@ -524,24 +526,23 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
             
         }
 
-        ///// Any difference on > 4.1 kernel with real NIC?
-        // I think MSG_DONTWAIT is having no affect here? Test on real NIC with NET_TX on seperate core
-        tx_bytes = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
+        //ret = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
+        ret = send(thd_opt->sock, NULL, 0, 0);
 
 
-        if (tx_bytes == -1) {
-
-            if (errno != ENOBUFS) {
-                tperror(thd_opt, "PACKET_MMAP Tx error");
-                pthread_exit((void*)EXIT_FAILURE);
-            } else {
-                thd_opt->stalling = 1;
-            }
-        
+        if (ret == -1) {
+            thd_opt->sk_err += 1;
         }
-        
-        thd_opt->tx_frms  += (tx_bytes / thd_opt->frame_sz);
-        thd_opt->tx_bytes += tx_bytes;
+
+        for (i = 0; i < thd_opt->frame_nr; i += 1) {
+            hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
+            if (hdr->tp_status == TP_STATUS_AVAILABLE) {
+                thd_opt->tx_frms += 1;
+                thd_opt->tx_bytes += thd_opt->frame_sz;
+            }
+            
+        }
+
 
     }
 
