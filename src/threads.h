@@ -40,6 +40,12 @@ static int32_t thd_init_stats(struct etherate *eth);
 // Spawn a worker thread
 static int32_t thd_init_worker(struct etherate *eth, uint16_t thread);
 
+// Join the stats thread on exit
+static void thd_join_stats(struct etherate *eth);
+
+// Join worker threads on exit
+static void thd_join_workers(struct etherate *eth);
+
 // Copy settings into a new worker thread
 static void thd_setup(struct etherate *eth, uint16_t thread);
 
