@@ -76,19 +76,16 @@ int main(int argc, char *argv[]) {
     etherate_setup(&eth);
 
     // Process CLI args
-    uint16_t cli_args_ret = cli_args(argc, argv, &eth);
+    uint16_t cli_ret = cli_args(argc, argv, &eth);
 
-    if (cli_args_ret == EXIT_FAILURE) {
+
+    if (cli_ret == EXIT_FAILURE) {
         etherate_cleanup(&eth);
-        return cli_args_ret;
-    } else if (cli_args_ret == EX_SOFTWARE) {
+        return cli_ret;
+    } else if (cli_ret == EX_SOFTWARE) {
         etherate_cleanup(&eth);
         return EXIT_SUCCESS;
     }
-
-
-    if (eth.app_opt.verbose) printf("Verbose output enabled.\n");
-
 
     // Ensure an interface has been chosen
     if (eth.sk_opt.if_index == -1) {
@@ -96,8 +93,10 @@ int main(int argc, char *argv[]) {
         return EX_SOFTWARE;
     }
 
+    if (eth.app_opt.verbose) printf("Verbose output enabled.\n");
 
-    // Put the interface into promisc mode
+
+    // Put the chosen interface into promisc mode
     int32_t promisc_ret = set_int_promisc(&eth);
     if (promisc_ret != EXIT_SUCCESS)
         return promisc_ret;
@@ -149,101 +148,23 @@ int main(int argc, char *argv[]) {
     // Create a copy of the program settings for each worker thread
     eth.thd_opt = calloc(sizeof(struct thd_opt), eth.app_opt.thd_nr);
 
+    // Spawn each worker thread
     for (uint16_t thread = 0; thread < eth.app_opt.thd_nr; thread += 1) {
 
         pthread_attr_init(&eth.app_opt.thd_attr[thread]);
         pthread_attr_setdetachstate(&eth.app_opt.thd_attr[thread], PTHREAD_CREATE_JOINABLE);
 
-        ///// Set thread priorities?
-        /*
-        pthread_attr_init(&t_attr_send);
-        pthread_attr_init(&t_attr_fill);
-     
-        pthread_attr_setschedpolicy(&t_attr_send,SCHED_RR);
-        pthread_attr_setschedpolicy(&t_attr_fill,SCHED_RR);
-     
-        para_send.sched_priority=20;
-        pthread_attr_setschedparam(&t_attr_send,&para_send);
-        para_fill.sched_priority=20;
-        pthread_attr_setschedparam(&t_attr_fill,&para_fill);
-        */
-
-        // Setup and copy default per-thread structures
+        // Setup and copy default per-thread structures and settings
         thd_setup(&eth, thread);
-
-        ///// Perhaps get the thread to set its own affinity first before it does anything else?
-        if (eth.app_opt.thd_affin) {
-            cpu_set_t current_cpu_set;
-
-            int cpu_to_bind = thread % eth.app_opt.thd_nr;
-            CPU_ZERO(&current_cpu_set);
-            // We count cpus from zero
-            CPU_SET(cpu_to_bind, &current_cpu_set);
-
-            /////int set_affinity_result = pthread_attr_setaffinity_np(thread_attrs.native_handle(), sizeof(cpu_set_t), &current_cpu_set);
-            int set_affinity_result = pthread_attr_setaffinity_np(&eth.app_opt.thd_attr[thread], sizeof(cpu_set_t), &current_cpu_set);
-
-            if (set_affinity_result != 0) {
-                printf("Can't set CPU affinity for thread\n");
-            }
-
-            /*
-
-            int ret = setpriority (PRIO_PROCESS, getpid (), priority);
-            if (ret)
-                panic ("Can't set nice val\n");
-            }
-            */
-
-        }
 
         if (thd_init_worker(&eth, thread) != EXIT_SUCCESS)
             return EXIT_FAILURE;
 
     }
 
-
-    // Free attributes and wait for the worker threads to finish
-    for(uint16_t thread = 0; thread < eth.app_opt.thd_nr; thread += 1) {
-        
-        if (pthread_attr_destroy(&eth.app_opt.thd_attr[thread]) != 0) {
-            perror("Can't remove thread attributes");
-        }
-        
-        int32_t thd_ret;
-        int32_t join_ret = pthread_join(eth.app_opt.thd[thread], (void*)&thd_ret);
-
-        if (join_ret != 0)
-            printf("Can't join worker thread %" PRIu32 ", return code is %" PRId32 "\n", eth.thd_opt[thread].thd_id, join_ret);
-
-        if (thd_ret != EXIT_SUCCESS) {
-            if (eth.app_opt.verbose)
-                printf("Worker thread %" PRIu32 " returned %" PRId32 "\n", eth.thd_opt[thread].thd_id, thd_ret);
-            eth.thd_opt[thread].quit = 1;
-        }
-
-        thd_cleanup(&eth.thd_opt[thread]);
-
-    }
-
-
-    // Free attributes and wait for the stats thread to finish
-    if (pthread_attr_destroy(&eth.app_opt.thd_attr[eth.app_opt.thd_nr]) != 0) {
-        perror("Can't remove thread attributes");
-    }
-
-    int32_t thd_ret;
-    int32_t join_ret = pthread_join(eth.app_opt.thd[eth.app_opt.thd_nr], (void*)&thd_ret);
-
-    if (join_ret != 0)
-        printf("Can't join stats thread, return code is %" PRId32 "\n", join_ret);
-
-    if (thd_ret != EXIT_SUCCESS) {
-        if (eth.app_opt.verbose)
-            printf("Completed join with stats thread with a status of %" PRId32 "\n", thd_ret);
-    }
-
-
+    // Wait for worker and stats threads to finish, then clean up
+    thd_join_workers(&eth);
+    thd_join_stats(&eth);
     etherate_cleanup(&eth);
 
 }

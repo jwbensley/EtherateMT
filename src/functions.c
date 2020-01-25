@@ -280,6 +280,12 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *eth) {
                 eth->app_opt.sk_mode = SKT_BIDI;
 
 
+            // Toggle strict thread/CPU affinity
+            } else if (strncmp(argv[i], "-x", 2) == 0) {
+
+                eth->app_opt.thd_affin = 1;
+
+
             // Enable verbose output
             } else if (strncmp(argv[i], "-v" ,2) == 0)  {
 
@@ -542,6 +548,8 @@ void print_usage () {
             "\t-t\tPin the worker threads to sequential cores and set the\n"
             "\t\thighest scheduling priority.\n"
             "\t-v\tEnable verbose output.\n"
+            "\t-x\tLock worker threads to individual CPUs.\n"
+            "\n"
             "\t-V|--version Display version\n"
             "\t-h|--help Display this help text\n",
             DEF_BLK_FRM_SZ, DEF_BLK_SZ, DEF_BLK_NR, DEF_THD_NR,
@@ -642,27 +650,30 @@ void signal_handler(int signal) {
 
         int32_t pcancel = pthread_cancel(eth->app_opt.thd[thread]);
         if (pcancel != 0)
-            printf("Can't cancel worker thread %" PRIu32 ", returned %" PRId32 "\n", eth->thd_opt[thread].thd_id, pcancel);
+            printf(
+                "Can't cancel worker thread %" PRIu32
+                ", returned %" PRId32 "\n",
+                eth->thd_opt[thread].thd_id, pcancel
+            );
 
         void *thd_ret = NULL;
         pthread_join(eth->app_opt.thd[thread], &thd_ret);
 
     }
 
-
     // Cancel the stats thread and join it
     int32_t pcancel = pthread_cancel(eth->app_opt.thd[eth->app_opt.thd_nr]);
     if (pcancel != 0) {
-        printf("Can't cancel stats thread %" PRIu32 ", returned %" PRId32 "\n", eth->thd_opt[eth->app_opt.thd_nr].thd_id, pcancel);
+        printf(
+            "Can't cancel stats thread %" PRIu32 ", returned %" PRId32 "\n",
+            eth->thd_opt[eth->app_opt.thd_nr].thd_id, pcancel
+        );
     }
 
     void *thd_ret = NULL;
     pthread_join(eth->app_opt.thd[eth->app_opt.thd_nr], &thd_ret);
 
-
     etherate_cleanup(eth);
-
-
     exit(signal);
 
 }

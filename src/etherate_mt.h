@@ -50,6 +50,7 @@
 #include <string.h>           // memcpy(), memset(), strncpy()
 #include <sys/random.h>       // getrandom()
 #include <sys/syscall.h>      // SYS_gettid
+#include <sys/sysinfo.h>      // get_nprocs()
 #include "sysexits.h"         // EX_NOPERM, EX_PROTOCOL, EX_SOFTWARE
 #include <unistd.h>           // getpagesize(), getpid(), getuid(), read(), sleep()
 #include <linux/version.h>    // KERNEL_VERSION(), LINUX_VERSION_CODE
@@ -90,14 +91,14 @@
 struct app_opt {
     uint8_t        err_len;
     char           *err_str;
-    int32_t        fanout_grp;
-    uint8_t        sk_mode;      // Tx/Rx/Bidi
-    uint8_t        sk_type;      // PACKET_MMAP, send(), sendmmsg() etc.
+    int32_t        fanout_grp; // CPU fanout group for AF_PACKET sockets
+    uint8_t        sk_mode;    // Tx/Rx/Bidi
+    uint8_t        sk_type;    // PACKET_MMAP, send(), sendmmsg() etc.
     pthread_t      *thd;
-    uint8_t        thd_affin; ///// Add CLI arg, try to avoid split NUMA node?
-    pthread_attr_t *thd_attr;
-    uint16_t       thd_nr;     // Number of worker threads
-    uint8_t        verbose;
+    uint8_t        thd_affin;  ///// Add CLI arg, try to avoid split NUMA node?
+    pthread_attr_t *thd_attr;  // pthread_attr_t
+    uint16_t       thd_nr;     // Number of worker threads to run
+    uint8_t        verbose;    // Verbose debugging toggle
 };
 
 // Frame and ring buffer options:
@@ -120,25 +121,26 @@ struct sk_opt {
 
 // A copy of the values required for each thread
 struct thd_opt {
+    int32_t  affinity;        // CPU this thread runs on or -1 for no affinity
     struct   sockaddr_ll bind_addr;
     uint32_t block_frm_sz;
     uint32_t block_nr;
     uint32_t block_sz;
     uint8_t  err_len;
     char     *err_str;
-    uint32_t fanout_grp;
+    uint32_t fanout_grp;      // CPU fanout group the socket is joined to
     uint32_t frame_nr;
     uint16_t frame_sz;
     uint16_t frm_sz_max;
-    int32_t  if_index;
+    int32_t  if_index;        // bind() a socket() to IfIndex
     uint8_t  if_name[IF_NAMESIZE];
     uint8_t* mmap_buf;        // Buffer used for PACKET_MMAP ring
     uint32_t msgvec_vlen;
     struct   iovec* ring;     // PACKET_MMAP ring
     uint8_t  quit;            // Signal stats thread to exit
     uint8_t  *rx_buffer;
-    uint64_t rx_bytes;
-    uint64_t rx_frms;
+    uint64_t rx_bytes;        // Total bytes received
+    uint64_t rx_frms;         // Total frames received
     uint64_t sk_err;          // Number of send/receive syscall errors
     uint8_t  sk_mode;         // Tx/Rx/Bidi
     uint8_t  sk_type;         // PACKET_MMAP, send(), sendmmsg() etc.
