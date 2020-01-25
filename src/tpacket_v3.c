@@ -515,6 +515,7 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
 
         for (i = 0; i < thd_opt->frame_nr; i += 1) {
             hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
+            ///// TODO
             // TPACKET2_HDRLEN == (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))   ///// Update for TPACKET V3
             // For raw Ethernet frames where the layer 2 headers are present
             // and the ring blocks are already aligned its fine to use:
@@ -526,7 +527,6 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
             
         }
 
-        //ret = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
         ret = send(thd_opt->sock, NULL, 0, 0);
 
 
