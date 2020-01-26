@@ -45,8 +45,16 @@ void *tpacket_v3_init(void* thd_opt_p) {
     pthread_cleanup_push(thd_cleanup, thd_opt_p);
     
 
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
 
 
     tpacket_v3_ring_align(thd_opt_p);
@@ -69,8 +77,8 @@ void *tpacket_v3_init(void* thd_opt_p) {
         uint32_t version     = (LINUX_VERSION_CODE >> 16);
         uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
         uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
-        printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ","
-               "TPACKET_V3 with PACKET_TX_RING requires 4.11.\n",
+        printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32
+               ", TPACKET_V3 with PACKET_TX_RING requires 4.11.\n",
                version, patch_level, sub_level);
         pthread_exit((void*)EXIT_FAILURE);
         #endif
@@ -82,8 +90,6 @@ void *tpacket_v3_init(void* thd_opt_p) {
 
 
     pthread_cleanup_pop(0);
-
-    
     return NULL;
 
 }

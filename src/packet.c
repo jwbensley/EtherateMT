@@ -31,26 +31,30 @@ void *packet_init(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
     
-
     // Save the thread tid
     pid_t thread_id;
     thread_id = syscall(SYS_gettid);
     thd_opt->thd_id = thread_id;
-
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     pthread_cleanup_push(thd_cleanup, thd_opt_p);
 
 
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
-
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
 
     if (packet_sock(thd_opt) != EXIT_SUCCESS) {
         pthread_exit((void*)EXIT_FAILURE);
     }
-
 
     if (thd_opt->sk_mode == SKT_RX) {
         packet_rx(thd_opt_p);
@@ -60,15 +64,13 @@ void *packet_init(void* thd_opt_p) {
 
 
     pthread_cleanup_pop(0);
-
-
     return NULL;
 
 }
 
 
 
- int32_t packet_sock(struct thd_opt *thd_opt) {
+int32_t packet_sock(struct thd_opt *thd_opt) {
 
     // Create a raw socket
     thd_opt->sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
