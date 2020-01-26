@@ -45,14 +45,20 @@ void *mmsg_init(void* thd_opt_p) {
     pthread_cleanup_push(thd_cleanup, thd_opt_p);
     
 
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
-
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
 
     if (mmsg_sock(thd_opt) != EXIT_SUCCESS) {
         pthread_exit((void*)EXIT_FAILURE);
     }
-
 
     if (thd_opt->sk_mode == SKT_RX) {
         mmsg_rx(thd_opt_p);
@@ -62,8 +68,6 @@ void *mmsg_init(void* thd_opt_p) {
 
 
     pthread_cleanup_pop(0);
-    
-
     return NULL;
 
 }

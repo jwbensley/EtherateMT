@@ -545,8 +545,6 @@ void print_usage () {
             "\t-r\tRun the worker threads in receive (Rx) mode.\n"
             "\t-rt\tRun the worker threads in bidirectional (BiDi) mode.\n"
             "\t\tHalf the worker threads run in Rx mode, half run in Tx mode.\n"
-            "\t-t\tPin the worker threads to sequential cores and set the\n"
-            "\t\thighest scheduling priority.\n"
             "\t-v\tEnable verbose output.\n"
             "\t-x\tLock worker threads to individual CPUs.\n"
             "\n"
