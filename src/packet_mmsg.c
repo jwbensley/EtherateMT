@@ -93,17 +93,26 @@ void mmsg_rx(struct thd_opt *thd_opt) {
 
     while(1) {
 
-        rx_frames = recvmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL);
+        /*
+         recvmmsg() returns the number of frames sent or -1 on error.
+         If some frames have been received in the vector and then an
+         error occurs, recvmmsg returns -1. For the received frames
+         msg_len is updated.
+        */
+        rx_frames = recvmmsg(
+            thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL
+        );
         
         if (rx_frames == -1) {
             thd_opt->sk_err += 1;
         }
 
-        for (int i = 0; i < rx_frames; i++) {
-            thd_opt->rx_bytes += mmsg_hdr[i].msg_len;
+        for (uint32_t i = 0; i < thd_opt->msgvec_vlen; i+= 1) {
+            if (mmsg_hdr[i].msg_len > 0) {
+                thd_opt->rx_bytes += mmsg_hdr[i].msg_len;
+                thd_opt->rx_frms += 1;
+            }
         }
-        
-        thd_opt->rx_frms += rx_frames;
 
     }
 
@@ -207,8 +216,8 @@ void mmsg_tx(struct thd_opt *thd_opt) {
     while (1) {
 
         /*
-         When using sendmmsg to send a batch of frames, unlike PACKET_MMAP, an
-         error is only returned if no datagrams were sent, rather than the
+         When using sendmmsg() to send a batch of frames, unlike PACKET_MMAP,
+         an error is only returned if no datagrams were sent, rather than the
          PACKET_MMAP approach to return an error if any one frame failed to
          send.
 
@@ -221,7 +230,11 @@ void mmsg_tx(struct thd_opt *thd_opt) {
         if (tx_frames == -1) {
             thd_opt->sk_err += 1;
         } else {
-            thd_opt->tx_bytes += (tx_frames * thd_opt->frame_sz);
+            ///// TODO
+            ///// No need to check frame size if all frames are the same size?
+            for (uint32_t i = 0; i < thd_opt->msgvec_vlen; i+= 1) {
+                thd_opt->tx_bytes += mmsg_hdr[i].msg_len;
+            }
             thd_opt->tx_frms += tx_frames;
         }
 
