@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,21 +25,20 @@
 
 
 
-#define S_O_PROMISC_ADD 1
-#define S_O_PROMISC_REM 2
-#define S_O_BIND        3
-#define S_O_QLEN        4
-#define S_O_LOSSY       5
-#define S_O_VER_TP      6
-#define S_O_NIC_TS      7
-#define S_O_TS          8
-#define S_O_QDISC       9
-#define S_O_RING_TP2    10
-#define S_O_RING_TP3    11
-#define S_O_MMAP_TP23   12
-#define S_O_FANOUT      13
+void *tpacket_v2_init() {
+
+    uint32_t version     = (LINUX_VERSION_CODE >> 16);
+    uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
+    uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
+
+    printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ", TPACKET_V2 not supported.\n", version, patch_level, sub_level);
+
+    return NULL;
+    
+}
 
 
 
-// Configure a socket option against thd_opt->sock_fd
-int32_t sock_op(uint8_t op, struct thd_opt *thd_opt);
+void tpacket_v2_stats() {
+    return;
+}

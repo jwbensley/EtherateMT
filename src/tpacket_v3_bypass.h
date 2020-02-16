@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,20 +25,12 @@
 
 
 
-void *tpacket_v2_init() {
+#ifndef _TPACKET_V3_BYPASS_H_
+#define _TPACKET_V3_BYPASS_H_
 
-    uint32_t version     = (LINUX_VERSION_CODE >> 16);
-    uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
-    uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
+// Fake function calls
+void *tpacket_v3_init();
 
-    printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ", TPACKET_V2 not supported.\n", version, patch_level, sub_level);
+void tpacket_v3_stats();
 
-    return NULL;
-    
-}
-
-
-
-void tpacket_v2_stats() {
-    return;
-}
+#endif // _TPACKET_V3_BYPASS_H_

@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,11 +25,11 @@
 
 
 
-#include "packet_mmsg.h"
+#include "packet_msg.h"
 
 
 
-void *mmsg_init(void* thd_opt_p) {
+void *msg_init(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
 
@@ -38,73 +38,73 @@ void *mmsg_init(void* thd_opt_p) {
     pid_t thread_id;
     thread_id = syscall(SYS_gettid);
     thd_opt->thd_id = thread_id;
-
+    
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
-    
-
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
 
 
-    if (mmsg_sock(thd_opt) != EXIT_SUCCESS) {
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
+
+    if (msg_sock(thd_opt) != EXIT_SUCCESS) {
         pthread_exit((void*)EXIT_FAILURE);
     }
 
-
     if (thd_opt->sk_mode == SKT_RX) {
-        mmsg_rx(thd_opt_p);
+        msg_rx(thd_opt_p);
     } else if (thd_opt->sk_mode == SKT_TX) {
-        mmsg_tx(thd_opt_p);
+        msg_tx(thd_opt_p);
     }
 
 
     pthread_cleanup_pop(0);
-    
-
     return NULL;
 
 }
 
 
 
-void mmsg_rx(struct thd_opt *thd_opt) {
+void msg_rx(struct thd_opt *thd_opt) {
 
-    int32_t rx_frames = 0;
+    int32_t rx_bytes = 0;
 
-    struct mmsghdr mmsg_hdr[thd_opt->msgvec_vlen];
-    struct iovec iov[thd_opt->msgvec_vlen];
-    memset(mmsg_hdr, 0, sizeof(mmsg_hdr));
-    memset(iov, 0, sizeof(iov));
+    struct msghdr msg_hdr;
+    struct iovec iov;
+    memset(&msg_hdr, 0, sizeof(msg_hdr));
+    memset(&iov, 0, sizeof(iov));
+
+    iov.iov_base = thd_opt->rx_buffer;
+    iov.iov_len = thd_opt->frame_sz;
+
+    msg_hdr.msg_name = NULL;
+    msg_hdr.msg_iov = &iov;
+    msg_hdr.msg_iovlen = 1;
+    msg_hdr.msg_control = NULL;
+    msg_hdr.msg_controllen = 0;
 
     thd_opt->started = 1;
 
-    for (uint32_t i = 0; i < thd_opt->msgvec_vlen; i += 1) {
-        iov[i].iov_base = thd_opt->rx_buffer;
-        iov[i].iov_len = thd_opt->frame_sz;
-        mmsg_hdr[i].msg_hdr.msg_iov = &iov[i];
-        mmsg_hdr[i].msg_hdr.msg_iovlen = 1;
-        mmsg_hdr[i].msg_hdr.msg_name = NULL;
-        mmsg_hdr[i].msg_hdr.msg_control = NULL;
-        mmsg_hdr[i].msg_hdr.msg_controllen = 0;
-    }
 
     while(1) {
 
-        rx_frames = recvmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0, NULL);
+        rx_bytes = recvmsg(thd_opt->sock, &msg_hdr, 0);
         
-        if (rx_frames == -1) {
-            tperror(thd_opt, "Socket Rx error");
-            pthread_exit((void*)EXIT_FAILURE);
+        if (rx_bytes == -1) {
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->rx_bytes += rx_bytes;
+            thd_opt->rx_frms += 1;            
         }
-
-        for (int i = 0; i < rx_frames; i++) {
-            thd_opt->rx_bytes += mmsg_hdr[i].msg_len;
-        }
-        
-        thd_opt->rx_frms += rx_frames;
 
     }
 
@@ -112,8 +112,7 @@ void mmsg_rx(struct thd_opt *thd_opt) {
 
 
 
-int32_t mmsg_sock(struct thd_opt *thd_opt) {
-
+int32_t msg_sock(struct thd_opt *thd_opt) {
 
     // Create a raw socket
     thd_opt->sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -170,52 +169,40 @@ int32_t mmsg_sock(struct thd_opt *thd_opt) {
     }
 
 
-    // Increase the socket Tx queue size so that the entire msg vector can fit
-    // into the socket Tx/Rx queue. The Kernel will double the value provided
-    // to allow for sk_buff overhead:
-    if (sock_op(S_O_QLEN, thd_opt) == -1) {
-        tperror(thd_opt, "Can't change the socket Tx queue length");
-        return EXIT_FAILURE;
-    }
-
-
-
     return EXIT_SUCCESS;
 
 }
 
 
 
-void mmsg_tx(struct thd_opt *thd_opt) {
+void msg_tx(struct thd_opt *thd_opt) {
 
-    int32_t tx_frames = 0;
+    int32_t tx_bytes;
 
-    struct mmsghdr mmsg_hdr[thd_opt->msgvec_vlen];
-    struct iovec iov[thd_opt->msgvec_vlen];
-    memset(mmsg_hdr, 0, sizeof(mmsg_hdr));
-    memset(iov, 0, sizeof(iov));
+    struct msghdr msg_hdr;
+    struct iovec iov;
+    memset(&msg_hdr, 0, sizeof(msg_hdr));
+    memset(&iov, 0, sizeof(iov));
+
+    iov.iov_base = thd_opt->tx_buffer;
+    iov.iov_len = thd_opt->frame_sz;
+
+    msg_hdr.msg_iov = &iov;
+    msg_hdr.msg_iovlen = 1;
 
     thd_opt->started = 1;
 
-    for (uint32_t i = 0; i < thd_opt->msgvec_vlen; i += 1) {
-        iov[i].iov_base = thd_opt->tx_buffer;
-        iov[i].iov_len = thd_opt->frame_sz;
-        mmsg_hdr[i].msg_hdr.msg_iov = &iov[i];
-        mmsg_hdr[i].msg_hdr.msg_iovlen = 1;
-    }
-
-
     while (1) {
 
-        tx_frames = sendmmsg(thd_opt->sock, mmsg_hdr, thd_opt->msgvec_vlen, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
+        tx_bytes = sendmsg(thd_opt->sock, &msg_hdr, 0);
 
-        if (tx_frames == -1) {
-            tperror(thd_opt, "Socket Tx error");
-            pthread_exit((void*)EXIT_FAILURE);
+        if (tx_bytes == -1) {
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->tx_bytes += tx_bytes;
+            thd_opt->tx_frms += 1;
         }
 
-        thd_opt->tx_bytes += (tx_frames * thd_opt->frame_sz);
-        thd_opt->tx_frms += tx_frames;
     }
 
 }

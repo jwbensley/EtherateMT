@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,20 +25,19 @@
 
 
 
-void *tpacket_v3_init() {
+#ifndef _PACKET_MMSG_H_
+#define _PACKET_MMSG_H_
 
-    uint32_t version     = (LINUX_VERSION_CODE >> 16);
-    uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
-    uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
+// Worker thread entry function
+void *mmsg_init(void* thd_opt_p);
 
-    printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ", TPACKET_V3 not supported.\n", version, patch_level, sub_level);
+// Rx thread loop using recvmmsg()
+void mmsg_rx(struct thd_opt *thd_opt);
 
-    return NULL;
-    
-}
+// Return socket FD for a non Tx/Rx ring socket
+int32_t mmsg_sock(struct thd_opt *thd_opt);
 
+// Tx thread loop using sendmmsg()
+void mmsg_tx(struct thd_opt *thd_opt);
 
-
-void tpacket_v3_stats() {
-    return;
-}
+#endif // _PACKET_MMSG_H_

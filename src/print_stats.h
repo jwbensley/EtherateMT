@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,14 +25,10 @@
 
 
 
-// Worker thread entry function
-void *msg_init(void* thd_opt_p);
+#ifndef _PRINT_STATS_H_
+#define _PRINT_STATS_H_
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t msg_sock(struct thd_opt *thd_opt);
+// Aggregate per-thread stats and print every second
+static void *print_pps(void *etherate_p);
 
-// Rx thread loop using recvmsg()
-void msg_rx(struct thd_opt *thd_opt);
-
-// Tx thread loop using sendmsg()
-void msg_tx(struct thd_opt *thd_opt);
+#endif // _PRINT_STATS_H_

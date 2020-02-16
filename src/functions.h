@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,14 +25,37 @@
 
 
 
-// Worker thread entry function
-void *mmsg_init(void* thd_opt_p);
+#ifndef _FUNCTIONS_H_
+#define _FUNCTIONS_H_
 
-// Rx thread loop using recvmmsg()
-void mmsg_rx(struct thd_opt *thd_opt);
+// Process CLI args
+uint8_t cli_args(int argc, char *argv[], struct etherate *eth);
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t mmsg_sock(struct thd_opt *thd_opt);
+// Cleanup main etherate struct
+void etherate_cleanup(struct etherate *eth);
 
-// Tx thread loop using sendmmsg()
-void mmsg_tx(struct thd_opt *thd_opt);
+// Populate settings with default values
+void etherate_setup(struct etherate *eth);
+
+// Return interface index from name
+int32_t get_if_index_by_name(uint8_t if_name[IF_NAMESIZE]);
+
+// List available AF_PACKET interfaces and their interface index
+void get_if_list();
+
+// Copy interface name from interface index number into char*
+void get_if_name_by_index(int32_t if_index, uint8_t* if_name);
+
+// Print CLI args and usage
+void print_usage();
+
+// Remove the interface from promiscuous mode
+int16_t rem_int_promisc(struct etherate *eth);
+
+// Set the interface an interface in promiscuous mode
+int16_t set_int_promisc(struct etherate *eth);
+
+// Signal handler to clean up threads
+void signal_handler(int signal);
+
+#endif // _FUNCTIONS_H_
