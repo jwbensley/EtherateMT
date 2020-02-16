@@ -292,6 +292,7 @@ static void thd_setup(struct etherate *eth, uint16_t thread) {
         eth->thd_opt[thread].tx_buffer == NULL) {
         printf("Failed to calloc() per-thread buffers!\n");
         exit(EXIT_FAILURE);
+        ////// TODO: return -1 to free() instead of exit()
     }
 
     // Copy the frame data into the thread local Tx buffer
