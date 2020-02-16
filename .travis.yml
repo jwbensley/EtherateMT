@@ -1,2 +1,4 @@
+# Force to Ubuntu 18, currently Travis defaults to Ubuntu 16 which doesn't sys/random.h getrandom():
+dist: bionic
 language: c
 script: gcc -o build/etherate_mt src/main.c -lpthread -O3 --std=c11
