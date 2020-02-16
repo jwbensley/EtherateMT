@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,41 +24,32 @@
  */
 
 
-// Process CLI args
-uint8_t cli_args(int argc, char *argv[], struct etherate *eth);
 
-// Cleanup main etherate struct
-void etherate_cleanup(struct etherate *eth);
+#ifndef _THREADS_H_
+#define _THREADS_H_
 
-// Populate settings with default values
-void etherate_setup(struct etherate *eth);
+// Alloc thread controls for all threads
+static void thd_alloc(struct etherate *eth);
 
-// Return interface index from name
-int32_t get_if_index_by_name(uint8_t if_name[IF_NAMESIZE]);
+// Butch: "Thread's dead baby, Thread's dead"
+static void thd_cleanup(void *thd_opt_p);
 
-// List available AF_PACKET interfaces and their interface index
-void get_if_list();
+// Spawn the stats printing thread
+static int32_t thd_init_stats(struct etherate *eth);
 
-// Copy interface name from interface index number into char*
-void get_if_name_by_index(int32_t if_index, uint8_t* if_name);
+// Spawn a worker thread
+static int32_t thd_init_worker(struct etherate *eth, uint16_t thread);
 
-// Print CLI usage/args
-void print_usage();
+// Join the stats thread on exit
+static void thd_join_stats(struct etherate *eth);
 
-// Remove the interface from promiscuous mode
-int16_t rem_int_promisc(struct etherate *eth);
+// Join worker threads on exit
+static void thd_join_workers(struct etherate *eth);
 
-// Set the interface an interface in promiscuous mode
-int16_t set_int_promisc(struct etherate *eth);
-
-// Signal handler to clean up threads
-void signal_handler(int signal);
-
-// Worker thread cleanup
-void thread_cleanup(void *thd_opt_p);
-
-// Set the default settings for a worker thread
-void thread_init(struct etherate *eth, uint16_t thread);
+// Copy settings into a new worker thread
+static void thd_setup(struct etherate *eth, uint16_t thread);
 
 // Print a custom message with the errno text and thread ID of the calling thread
-void tperror(struct thd_opt *thd_opt, const char *msg);
+static void tperror(struct thd_opt *thd_opt, const char *msg);
+
+#endif // _THREADS_H_

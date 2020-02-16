@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,90 +25,52 @@
 
 
 
-#include "packet_msg.h"
+#include "packet.h"
 
-
-
-void *msg_init(void* thd_opt_p) {
+void *packet_init(void* thd_opt_p) {
 
     struct thd_opt *thd_opt = thd_opt_p;
-
-
+    
     // Save the thread tid
     pid_t thread_id;
     thread_id = syscall(SYS_gettid);
     thd_opt->thd_id = thread_id;
-    
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
 
 
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
 
-
-    if (msg_sock(thd_opt) != EXIT_SUCCESS) {
+    if (packet_sock(thd_opt) != EXIT_SUCCESS) {
         pthread_exit((void*)EXIT_FAILURE);
     }
 
-
     if (thd_opt->sk_mode == SKT_RX) {
-        msg_rx(thd_opt_p);
+        packet_rx(thd_opt_p);
     } else if (thd_opt->sk_mode == SKT_TX) {
-        msg_tx(thd_opt_p);
+        packet_tx(thd_opt_p);
     }
 
 
     pthread_cleanup_pop(0);
-
-
     return NULL;
 
 }
 
 
 
-void msg_rx(struct thd_opt *thd_opt) {
-
-    int32_t rx_bytes = 0;
-
-    struct msghdr msg_hdr;
-    struct iovec iov;
-    memset(&msg_hdr, 0, sizeof(msg_hdr));
-    memset(&iov, 0, sizeof(iov));
-
-    iov.iov_base = thd_opt->rx_buffer;
-    iov.iov_len = thd_opt->frame_sz;
-
-    msg_hdr.msg_name = NULL;
-    msg_hdr.msg_iov = &iov;
-    msg_hdr.msg_iovlen = 1;
-    msg_hdr.msg_control = NULL;
-    msg_hdr.msg_controllen = 0;
-
-    thd_opt->started = 1;
-
-    while(1) {
-
-        rx_bytes = recvmsg(thd_opt->sock, &msg_hdr, 0);
-        
-        if (rx_bytes == -1) {
-            tperror(thd_opt, "Socket Rx error");
-            pthread_exit((void*)EXIT_FAILURE);
-        }
-
-        thd_opt->rx_bytes += rx_bytes;
-        thd_opt->rx_frms += 1;
-
-    }
-
-}
-
-
-
-int32_t msg_sock(struct thd_opt *thd_opt) {
+int32_t packet_sock(struct thd_opt *thd_opt) {
 
     // Create a raw socket
     thd_opt->sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -166,39 +128,52 @@ int32_t msg_sock(struct thd_opt *thd_opt) {
 
 
     return EXIT_SUCCESS;
+}
+
+
+
+void packet_rx(struct thd_opt *thd_opt) {
+
+    int32_t rx_bytes;
+    
+    thd_opt->started = 1;
+
+    while(1) {
+
+        rx_bytes = read(thd_opt->sock, thd_opt->rx_buffer, DEF_FRM_SZ_MAX);
+        
+        if (rx_bytes == -1) {
+            thd_opt->sk_err += 1;
+        }
+
+        thd_opt->rx_bytes += rx_bytes;
+        thd_opt->rx_frms += 1;
+
+    }
 
 }
 
 
 
-void msg_tx(struct thd_opt *thd_opt) {
+void packet_tx(struct thd_opt *thd_opt) {
 
     int32_t tx_bytes;
 
-    struct msghdr msg_hdr;
-    struct iovec iov;
-    memset(&msg_hdr, 0, sizeof(msg_hdr));
-    memset(&iov, 0, sizeof(iov));
-
-    iov.iov_base = thd_opt->tx_buffer;
-    iov.iov_len = thd_opt->frame_sz;
-
-    msg_hdr.msg_iov = &iov;
-    msg_hdr.msg_iovlen = 1;
-
     thd_opt->started = 1;
 
-    while (1) {
-
-        tx_bytes = sendmsg(thd_opt->sock, &msg_hdr, 0); //// Is MSG_DONTWAIT supported? Would it make any difference?
+    while(1) {
+   
+        tx_bytes = send(thd_opt->sock, thd_opt->tx_buffer,
+                        thd_opt->frame_sz, 0);        
 
         if (tx_bytes == -1) {
-            tperror(thd_opt, "Socket Tx error");
-            pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
+        } else {
+            thd_opt->tx_bytes += tx_bytes;
+            thd_opt->tx_frms += 1;
         }
 
-        thd_opt->tx_bytes += tx_bytes;
-        thd_opt->tx_frms += 1;
+
     }
 
 }

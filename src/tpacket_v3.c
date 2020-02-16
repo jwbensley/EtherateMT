@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,11 +42,19 @@ void *tpacket_v3_init(void* thd_opt_p) {
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
     
 
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
 
 
     tpacket_v3_ring_align(thd_opt_p);
@@ -69,8 +77,8 @@ void *tpacket_v3_init(void* thd_opt_p) {
         uint32_t version     = (LINUX_VERSION_CODE >> 16);
         uint32_t patch_level = (LINUX_VERSION_CODE & 0xffff) >> 8;
         uint32_t sub_level   = (LINUX_VERSION_CODE & 0xff);
-        printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32 ","
-               "TPACKET_V3 with PACKET_TX_RING requires 4.11.\n",
+        printf("Kernel version detected as %" PRIu32 ".%" PRIu32 ".%" PRIu32
+               ", TPACKET_V3 with PACKET_TX_RING requires 4.11.\n",
                version, patch_level, sub_level);
         pthread_exit((void*)EXIT_FAILURE);
         #endif
@@ -82,8 +90,6 @@ void *tpacket_v3_init(void* thd_opt_p) {
 
 
     pthread_cleanup_pop(0);
-
-    
     return NULL;
 
 }
@@ -291,8 +297,10 @@ void tpacket_v3_rx(struct thd_opt *thd_opt) {
             int32_t poll_ret = poll(&pfd, 1, -1);
 
             if (poll_ret == -1) {
-                tperror(thd_opt, "Rx poll error");
-                pthread_exit((void*)EXIT_FAILURE);
+                ///// TODO
+                /////tperror(thd_opt, "Rx poll error");
+                /////pthread_exit((void*)EXIT_FAILURE);
+                thd_opt->sk_err += 1;
             }
 
             if (pfd.revents != POLLIN)
@@ -484,8 +492,9 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
     struct tpacket3_hdr *hdr;
     uint8_t *data;
     uint32_t i;
-    int64_t tx_bytes = 0;
+    int64_t ret = 0;
     
+    thd_opt->started = 1;
 
     /*
     TPACKET_V2 --> TPACKET_V3:
@@ -506,13 +515,13 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
           Packets with non-zero values of tp_next_offset will be dropped.
     */
 
-    thd_opt->started = 1;
     
     while(1) {
 
 
         for (i = 0; i < thd_opt->frame_nr; i += 1) {
             hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
+            ///// TODO
             // TPACKET2_HDRLEN == (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))   ///// Update for TPACKET V3
             // For raw Ethernet frames where the layer 2 headers are present
             // and the ring blocks are already aligned its fine to use:
@@ -524,24 +533,22 @@ void tpacket_v3_tx(struct thd_opt *thd_opt) {
             
         }
 
-        ///// Any difference on > 4.1 kernel with real NIC?
-        // I think MSG_DONTWAIT is having no affect here? Test on real NIC with NET_TX on seperate core
-        tx_bytes = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
+        ret = send(thd_opt->sock, NULL, 0, 0);
 
 
-        if (tx_bytes == -1) {
-
-            if (errno != ENOBUFS) {
-                tperror(thd_opt, "PACKET_MMAP Tx error");
-                pthread_exit((void*)EXIT_FAILURE);
-            } else {
-                thd_opt->stalling = 1;
-            }
-        
+        if (ret == -1) {
+            thd_opt->sk_err += 1;
         }
-        
-        thd_opt->tx_frms  += (tx_bytes / thd_opt->frame_sz);
-        thd_opt->tx_bytes += tx_bytes;
+
+        for (i = 0; i < thd_opt->frame_nr; i += 1) {
+            hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
+            if (hdr->tp_status == TP_STATUS_AVAILABLE) {
+                thd_opt->tx_frms += 1;
+                thd_opt->tx_bytes += thd_opt->frame_sz;
+            }
+            
+        }
+
 
     }
 

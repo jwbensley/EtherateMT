@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,23 +24,27 @@
  */
 
 
-// Worker thread entry function
-void *tpacket_v2_init(void* thd_opt_p);
 
-// TX/RX_RING ring/block alignment
-void tpacket_v2_ring_align(struct thd_opt *thd_opt);
+#ifndef _SOCK_OP_H_
+#define _SOCK_OP_H_
 
-// TX/RX_RING init
-void tpacket_v2_ring_init(struct thd_opt *thd_opt);
+#define S_O_PROMISC_ADD 1
+#define S_O_PROMISC_REM 2
+#define S_O_BIND        3
+#define S_O_QLEN        4
+#define S_O_LOSSY       5
+#define S_O_VER_TP      6
+#define S_O_NIC_TS      7
+#define S_O_TS          8
+#define S_O_QDISC       9
+#define S_O_RING_TP2    10
+#define S_O_RING_TP3    11
+#define S_O_MMAP_TP23   12
+#define S_O_FANOUT      13
 
-// PACKET_MMAP Rx thread loop
-void tpacket_v2_rx(struct thd_opt *thd_opt);
 
-// Return PACKET_MMAP socket FD
-int32_t tpacket_v2_sock(struct thd_opt *thd_opt);
 
-// TPACKET V2 Rx socket stats
-void tpacket_v2_stats(struct thd_opt *thd_opt, uint64_t *rx_drops);
+// Configure a socket option against thd_opt->sock_fd
+int32_t sock_op(uint8_t op, struct thd_opt *thd_opt);
 
-// PACKET_MMAP Tx thread loop
-void tpacket_v2_tx(struct thd_opt *thd_opt);
+#endif // _SOCK_OP_H_

@@ -1,3 +1,15 @@
+-----EtherateMT 1.0 2020-02
+
+[MAJOR] Fixed issue #44; Error handling for Tx/Rx syscalls is incorrect
+
+[MINOR] Fixed issue #39; Move threading out of main()
+
+[MINOR] Fixed issue #38; rand() is never initialized in main()
+
+[FEATURE] Added enhancement #34; Implement CPU pinning and scheduler priority
+
+
+
 -----EtherateMT 0.7 Beta 2018-04
 
 [FEATURE] Added enhancement #33; Implement additional compiler checkes

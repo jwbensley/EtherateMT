@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,14 +25,12 @@
 
 
 
-// Worker thread entry function
-void *packet_init(void* thd_opt_p);
+#ifndef _TPACKET_V2_BYPASS_H_
+#define _TPACKET_V2_BYPASS_H_
 
-// Return socket FD for a non Tx/Rx ring socket
-int32_t packet_sock(struct thd_opt *thd_opt);
+// Fake function calls
+void *tpacket_v2_init();
 
-// Rx thread loop using read()
-void packet_rx(struct thd_opt *thd_opt);
+void tpacket_v2_stats();
 
-// Tx thread loop using sendto()
-void packet_tx(struct thd_opt *thd_opt);
+#endif // _TPACKET_V2_BYPASS_H_

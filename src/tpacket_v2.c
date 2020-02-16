@@ -1,7 +1,7 @@
 /*
  * License: MIT
  *
- * Copyright (c) 2016-2018 James Bensley.
+ * Copyright (c) 2017-2020 James Bensley.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,20 +42,26 @@ void *tpacket_v2_init(void* thd_opt_p) {
 
     // Set the thread cancel type and register the cleanup handler
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    pthread_cleanup_push(thread_cleanup, thd_opt_p);
+    pthread_cleanup_push(thd_cleanup, thd_opt_p);
 
     
-    if (thd_opt->verbose)
-        printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+    if (thd_opt->verbose) {
+        if (thd_opt->affinity >= 0) {
+            printf(
+                "Worker thread %" PRIu32 " started, bound to CPU %" PRId32 "\n",
+                thd_opt->thd_id, thd_opt->affinity
+            );
+        } else {
+            printf("Worker thread %" PRIu32 " started\n", thd_opt->thd_id);
+        }
+    }
 
 
     tpacket_v2_ring_align(thd_opt_p);
 
-
     if (tpacket_v2_sock(thd_opt) != EXIT_SUCCESS) {
         pthread_exit((void*)EXIT_FAILURE);
     }
-
 
     if (thd_opt->sk_mode == SKT_RX) {
         tpacket_v2_rx(thd_opt_p);
@@ -68,8 +74,6 @@ void *tpacket_v2_init(void* thd_opt_p) {
 
 
     pthread_cleanup_pop(0);
-
-
     return NULL;
 
 }
@@ -273,8 +277,10 @@ void tpacket_v2_rx(struct thd_opt *thd_opt) {
     while(1) {
 
         if (poll(&pfd, 1, -1) == -1) {
-            tperror(thd_opt, "Rx poll error");
-            pthread_exit((void*)EXIT_FAILURE);
+            ///// TODO
+            /////tperror(thd_opt, "Rx poll() error");
+            ////pthread_exit((void*)EXIT_FAILURE);
+            thd_opt->sk_err += 1;
         }
 
         if (pfd.revents != POLLIN)
@@ -453,9 +459,10 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
     struct tpacket2_hdr *hdr;
     uint8_t *data;
     uint32_t i;
-    int64_t tx_bytes = 0;
-    
+    int64_t ret = 0;
+
     thd_opt->started = 1;
+
 
     while(1) {
 
@@ -472,25 +479,49 @@ void tpacket_v2_tx(struct thd_opt *thd_opt) {
             
         }
 
-        ///// Any difference on > 4.1 kernel with real NIC?
-        // I think MSG_DONTWAIT is having no affect here? Test on real NIC with NET_TX on seperate core
-        tx_bytes = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
+        /*
+         When using MSG_DONTWAIT as follows:
+          ret = sendto(thd_opt->sock, NULL, 0, MSG_DONTWAIT, NULL, 0);
+          The sendto() call returns if it would block, i.e. if we are running
+          at line rate. There is no benefit to returning because we're in an
+          infinite loop calling sendto(), so we'd just call it again, context
+          switching between kernel and user space all the time. So this flag is
+          not used here.
+
+          Also note that below the following could be used:
+          ret = sendto(thd_opt->sock, NULL, 0, 0, NULL, 0);
+          Both send() and sendto() ultimately call __sys_sendto()
+         */
+        ret = send(thd_opt->sock, NULL, 0, 0);
 
 
-        if (tx_bytes == -1) {
+        /*
+         When evaluating the return value of send() or sendto(), after a
+         successful call the number of bytes transmitted is returned or -1 on
+         error and errno is set.
+         However, when transmitting a ring of packets, if any one of the frames 
+         in the TX ring failed to transmit (even though some or even all except
+         one may have been successful) the return code for the
+         transmission of this >entire ring buffer< is set to -1 and errno is
+         set, which means the return value can't be relied upon to get the
+         number of bytes transmitted (this is by design for AF_PACKET rings).
 
-            if (errno != ENOBUFS) {
-                tperror(thd_opt, "PACKET_MMAP Tx error");
-                pthread_exit((void*)EXIT_FAILURE);
-            } else {
-                thd_opt->stalling = 1;
-            }
-        
+         Instead we must check the return code from sendto() for -1, and
+         then walk the TX ring and check that status flag of each packet in the
+         ring to see if it was transmitted.
+        */
+        if (ret == -1) {
+            thd_opt->sk_err += 1;
         }
- 
-        thd_opt->tx_frms  += (tx_bytes / thd_opt->frame_sz);
-        thd_opt->tx_bytes += tx_bytes;
- 
-    }
 
+        for (i = 0; i < thd_opt->frame_nr; i += 1) {
+            hdr = (void*)(thd_opt->mmap_buf + (thd_opt->block_frm_sz * i));
+            if (hdr->tp_status == TP_STATUS_AVAILABLE) {
+                thd_opt->tx_frms += 1;
+                thd_opt->tx_bytes += thd_opt->frame_sz;
+            }
+            
+        }
+
+    }
 }
