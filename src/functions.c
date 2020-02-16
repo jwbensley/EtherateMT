@@ -244,7 +244,13 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *eth) {
                 }
 
 
-            // Use PACKET_MMAP with sendto()/poll() syscalls
+            // Use send()/read() syscalls
+            } else if (strncmp(argv[i], "-p0", 3) == 0) {
+
+                eth->app_opt.sk_type = SKT_PACKET;
+
+
+            // Use PACKET_MMAP with send()/poll() syscalls
             } else if (strncmp(argv[i], "-p1", 3) == 0) {
 
                 eth->app_opt.sk_type = SKT_PACKET_MMAP2;
@@ -262,7 +268,7 @@ uint8_t cli_args(int argc, char *argv[], struct etherate *eth) {
                 eth->app_opt.sk_type = SKT_SENDMMSG;
 
 
-            // Use PACKET_MMAP with sendto()poll() syscalls
+            // Use PACKET_MMAP with send()/poll() syscalls
             } else if (strncmp(argv[i], "-p4", 3) == 0) {
 
                 eth->app_opt.sk_type = SKT_PACKET_MMAP3;
@@ -536,15 +542,14 @@ void print_usage () {
             "\t-l\tList available interfaces.\n"
             "\t-m\tSet the number of packets to batch process with sendmmsg()/recvmmsg().\n"
             "\t\tDefault is %" PRId16 ".\n"
-            "\t-p[1-4]\tThe default send/receive mode processes a single packet per send()/read() syscall.\n"
+            "\t-p[0-4]\tChose the Kernel send/receive method.\n"
+            "\t-p0\tThis is the default send/receive mode, a single packet per send()/read() syscall.\n"
             "\t-p1\tSwith to PACKET_MMAP mode using PACKET_TX/RX_RING v2 to batch process a ring of packets.\n"
             "\t-p2\tSwitch to sendmsg()/recvmsg() syscalls per packet.\n"
             "\t-p3\tSwitch to sendmmsg()/recvmmsg() syscalls to batch process packets.\n"
             "\t-p4\tSwitch to PACKET_MMAP mode with PACKET_TX/RX_RING v3 to batch process a ring of packets.\n"
             "\t-[r|rt]\tThe default mode for a worker thread is transmit (Tx).\n"
             "\t-r\tRun the worker threads in receive (Rx) mode.\n"
-            "\t-rt\tRun the worker threads in bidirectional (BiDi) mode.\n"
-            "\t\tHalf the worker threads run in Rx mode, half run in Tx mode.\n"
             "\t-v\tEnable verbose output.\n"
             "\t-x\tLock worker threads to individual CPUs.\n"
             "\n"
