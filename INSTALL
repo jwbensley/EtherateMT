@@ -1,13 +1,13 @@
 /* Perform a "regular" compile */
 
-gcc -o build/etherate_mt src/etherate_mt.c -lpthread -O3 --std=c11
+gcc -o build/etherate_mt src/main.c -lpthread -O3 --std=c11
 
 
 
 / * Perform a "strict" compile - requires a more recent GCC version,
     to check for various code issues */
 
-gcc -o build/etherate_mt src/etherate_mt.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
+gcc -o build/etherate_mt src/main.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
 
 /*
   -lpthread
@@ -133,7 +133,7 @@ gcc -o build/etherate_mt src/etherate_mt.c -lpthread -Wall -Werror -pedantic -ft
 /* Perform a "debug" compile - use with tools like val-/call-/cache-grind,
    GDB, perf etc */
 
-gcc -o build/etherate_mt src/etherate_mt.c -lpthread -fstack-protector-all -Og -g --std=c11 -fsanitize=address
+gcc -o build/etherate_mt src/main.c -lpthread -fstack-protector-all -Og -g --std=c11 -fsanitize=address
 
 /*
 

@@ -25,7 +25,7 @@
 
 
 
-#include "etherate_mt.h"
+#include "main.h"
 #include "threads.h"
 
 #include "functions.c"
