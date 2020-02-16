@@ -58,7 +58,7 @@
 
 
 // Global constants:
-#define app_version "MT 0.7.beta 2018-04"
+#define app_version "MT 1.0 2020-02"
 
 
 
