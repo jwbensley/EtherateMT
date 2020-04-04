@@ -139,14 +139,13 @@ int main(int argc, char *argv[]) {
     }
 
 
+    // Create a copy of the program settings for each worker thread.
+    eth.thd_opt = calloc(sizeof(struct thd_opt), eth.app_opt.thd_nr);
+
     thd_alloc(&eth);
     // Spawn the stats printing thread
     if (thd_init_stats(&eth) != EXIT_SUCCESS)
         return EXIT_FAILURE;
-
-
-    // Create a copy of the program settings for each worker thread
-    eth.thd_opt = calloc(sizeof(struct thd_opt), eth.app_opt.thd_nr);
 
     // Spawn each worker thread
     for (uint16_t thread = 0; thread < eth.app_opt.thd_nr; thread += 1) {

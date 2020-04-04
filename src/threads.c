@@ -180,12 +180,6 @@ static int32_t thd_init_worker(struct etherate *eth, uint16_t thread) {
 
 static void thd_join_stats(struct etherate *eth) {
 
-    // Free attributes and wait for the stats thread to finish
-    if (pthread_attr_destroy(
-            &eth->app_opt.thd_attr[eth->app_opt.thd_nr]) != 0
-        )
-        perror("Can't remove thread attributes");
-
     int32_t thd_ret;
     int32_t join_ret = pthread_join(
         eth->app_opt.thd[eth->app_opt.thd_nr],
@@ -213,12 +207,7 @@ static void thd_join_stats(struct etherate *eth) {
 
 static void thd_join_workers(struct etherate *eth) {
 
-    // Free thread attributes and wait for the worker threads to finish
     for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread += 1) {
-        
-        if (pthread_attr_destroy(&eth->app_opt.thd_attr[thread]) != 0) {
-            perror("Can't remove worker thread attributes");
-        }
         
         int32_t thd_ret;
         int32_t join_ret = pthread_join(
