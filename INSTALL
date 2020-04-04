@@ -9,6 +9,13 @@ gcc -o build/etherate_mt src/main.c -lpthread -O3 --std=c11
 
 gcc -o build/etherate_mt src/main.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
 
+gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=leak -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract
+
+gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=alignment -fsanitize=thread
+
+# Not supported in GCC version
+-fsanitize=pointer-compare -fsanitize=pointer-subtract
+
 /*
   -lpthread
   Compile with support for Pthreads
@@ -126,6 +133,12 @@ gcc -o build/etherate_mt src/main.c -lpthread -Wall -Werror -pedantic -ftrapv -O
    about using "const" in declarations and prototypes. Otherwise, it is just a
    nuisance. This is why we did not make -Wall request these warnings.
 
+  -fsanitize=address
+   Enable AddressSanitizer, a fast memory error detector. Memory access
+   instructions are instrumented to detect out-of-bounds and use-after-free
+   bugs.
+   !! This will not work with Valgrind !!
+
 */
 
 
@@ -133,20 +146,14 @@ gcc -o build/etherate_mt src/main.c -lpthread -Wall -Werror -pedantic -ftrapv -O
 /* Perform a "debug" compile - use with tools like val-/call-/cache-grind,
    GDB, perf etc */
 
-gcc -o build/etherate_mt src/main.c -lpthread -fstack-protector-all -Og -g --std=c11 -fsanitize=address
+gcc -o build/etherate_mt src/main.c -lpthread -fstack-protector-all -Og -g --std=c11
 
 /*
 
   -fstack-protector-all
    Like -fstack-protector except that all functions are protected.
 
-  -fsanitize=address
-   Enable AddressSanitizer, a fast memory error detector. Memory access
-   instructions are instrumented to detect out-of-bounds and use-after-free
-   bugs.
-   !! This will not work with Valgrind !!
-
-  -Og
+   Og:
    With -O, the compiler tries to reduce code size and execution time, without
    performing any optimizations that take a great deal of compilation time.
   -O0

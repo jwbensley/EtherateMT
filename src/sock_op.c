@@ -88,12 +88,13 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
                 if (sock_wmem_cur < sock_wmem) {
 
-                    if (thd_opt->verbose)
+                    if (thd_opt->verbose) {
                         printf("%" PRIu32 ":Current socket write buffer size is %" PRId32
                                " bytes, desired write buffer size is %" PRId32 " bytes.\n",
                                thd_opt->thd_id, sock_wmem_cur, sock_wmem);
                         printf("%" PRIu32 ":Trying to increase to %" PRId32 " bytes...\n",
                                thd_opt->thd_id, sock_wmem);
+                    }
 
                     if (setsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF, &sock_wmem,
                                    sizeof(sock_wmem)) < 0) {
@@ -168,12 +169,13 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
                 if (sock_rmem_cur < sock_rmem) {
 
-                    if (thd_opt->verbose)
+                    if (thd_opt->verbose) {
                         printf("%" PRIu32 ":Current socket read buffer size is %" PRId32
                                " bytes, desired read buffer size is %" PRId32 " bytes.\n",
                                thd_opt->thd_id, sock_rmem_cur, sock_rmem);
                         printf("%" PRIu32 ":Trying to increase to %" PRId32 " bytes...\n",
                                thd_opt->thd_id, sock_rmem);
+                    }
 
                     if (setsockopt(thd_opt->sock, SOL_SOCKET, SO_SNDBUF,
                                    &sock_rmem, sizeof(sock_rmem)) < 0) {
@@ -229,10 +231,12 @@ int32_t sock_op(uint8_t op, struct thd_opt *thd_opt) {
 
                     }
 
-                }
+                } 
 
                 return EXIT_SUCCESS;
 
+            } else {
+                return -1; // Unsupported/undefined socket mode
             }
 
 
