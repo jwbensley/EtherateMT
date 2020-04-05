@@ -180,12 +180,6 @@ static int32_t thd_init_worker(struct etherate *eth, uint16_t thread) {
 
 static void thd_join_stats(struct etherate *eth) {
 
-    // Free attributes and wait for the stats thread to finish
-    if (pthread_attr_destroy(
-            &eth->app_opt.thd_attr[eth->app_opt.thd_nr]) != 0
-        )
-        perror("Can't remove thread attributes");
-
     int32_t thd_ret;
     int32_t join_ret = pthread_join(
         eth->app_opt.thd[eth->app_opt.thd_nr],
@@ -213,12 +207,7 @@ static void thd_join_stats(struct etherate *eth) {
 
 static void thd_join_workers(struct etherate *eth) {
 
-    // Free thread attributes and wait for the worker threads to finish
     for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread += 1) {
-        
-        if (pthread_attr_destroy(&eth->app_opt.thd_attr[thread]) != 0) {
-            perror("Can't remove worker thread attributes");
-        }
         
         int32_t thd_ret;
         int32_t join_ret = pthread_join(
@@ -250,7 +239,7 @@ static void thd_join_workers(struct etherate *eth) {
 
 
 
-static void thd_setup(struct etherate *eth, uint16_t thread) {
+static int32_t thd_setup(struct etherate *eth, uint16_t thread) {
 
     // Set up thread local copies of all settings
     eth->thd_opt[thread].affinity     = -1;
@@ -291,8 +280,7 @@ static void thd_setup(struct etherate *eth, uint16_t thread) {
         eth->thd_opt[thread].rx_buffer == NULL ||
         eth->thd_opt[thread].tx_buffer == NULL) {
         printf("Failed to calloc() per-thread buffers!\n");
-        exit(EXIT_FAILURE);
-        ////// TODO: return -1 to free() instead of exit()
+        return EXIT_FAILURE;
     }
 
     // Copy the frame data into the thread local Tx buffer
@@ -336,6 +324,42 @@ static void thd_setup(struct etherate *eth, uint16_t thread) {
         }
 
     }
+
+    return EXIT_SUCCESS;
+
+}
+
+
+
+static int32_t thd_spawn_workers(struct etherate *eth) {
+
+    for (uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread += 1) {
+
+        pthread_attr_init(&eth->app_opt.thd_attr[thread]);
+        pthread_attr_setdetachstate(&eth->app_opt.thd_attr[thread],
+            PTHREAD_CREATE_JOINABLE
+        );
+
+        // Setup and copy default per-thread structures and settings
+        if (thd_setup(eth, thread) != EXIT_SUCCESS) {
+            for (uint16_t thd = 0; thd <= thread; thd += 1) {
+                thd_cleanup(&eth->thd_opt[thd]);
+            }
+            etherate_cleanup(eth);
+            return EXIT_FAILURE;
+        }
+
+        if (thd_init_worker(eth, thread) != EXIT_SUCCESS) {
+            for (uint16_t thd = 0; thd <= thread; thd += 1) {
+                thd_cleanup(&eth->thd_opt[thd]);
+            }
+            etherate_cleanup(eth);
+            return EXIT_FAILURE;
+        }
+
+    }
+
+    return EXIT_SUCCESS;
 
 }
 

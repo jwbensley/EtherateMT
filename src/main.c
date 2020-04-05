@@ -139,28 +139,17 @@ int main(int argc, char *argv[]) {
     }
 
 
+    // Create a copy of the program settings for each worker thread.
+    eth.thd_opt = calloc(sizeof(struct thd_opt), eth.app_opt.thd_nr);
+
     thd_alloc(&eth);
     // Spawn the stats printing thread
     if (thd_init_stats(&eth) != EXIT_SUCCESS)
         return EXIT_FAILURE;
 
-
-    // Create a copy of the program settings for each worker thread
-    eth.thd_opt = calloc(sizeof(struct thd_opt), eth.app_opt.thd_nr);
-
     // Spawn each worker thread
-    for (uint16_t thread = 0; thread < eth.app_opt.thd_nr; thread += 1) {
-
-        pthread_attr_init(&eth.app_opt.thd_attr[thread]);
-        pthread_attr_setdetachstate(&eth.app_opt.thd_attr[thread], PTHREAD_CREATE_JOINABLE);
-
-        // Setup and copy default per-thread structures and settings
-        thd_setup(&eth, thread);
-
-        if (thd_init_worker(&eth, thread) != EXIT_SUCCESS)
-            return EXIT_FAILURE;
-
-    }
+    if (thd_spawn_workers(&eth) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
 
     // Wait for worker and stats threads to finish, then clean up
     thd_join_workers(&eth);

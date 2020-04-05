@@ -55,7 +55,8 @@ void *print_stats(void *etherate_p) {
     double   rx_gbps       = 0;
     double   tx_gbps       = 0;
 
-    // Wait for one of the Tx/Rx threads to start
+    // Wait for one of the Tx/Rx tworker hreads to start, otherwise this thread
+    // will be printing all zero's every second
     uint8_t waiting = 1;
     while (waiting) {
         for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread++) {
@@ -65,10 +66,11 @@ void *print_stats(void *etherate_p) {
     }
 
 
-    // Wait for 1 second otherwise the first stats print will be all-zeros.
+    // After a working thread has started wait for 1 second to accumulate stats
     sleep(1);
 
 
+    // main loop:
     while(1) {
 
         rx_bytes_now = 0;
