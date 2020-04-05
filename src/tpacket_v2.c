@@ -416,7 +416,7 @@ int32_t tpacket_v2_sock(struct thd_opt *thd_opt) {
     }
 
 
-    // Allocate an iovec for each frame block within the ring
+    // Allocate an iovec for each frame block within the ring, for Rx polling
     // (one frame per block in TPACKET v2)
     thd_opt->ring = (struct iovec*)calloc(tpacket_req.tp_frame_nr * sizeof(struct iovec), 1);
     if (thd_opt->ring == NULL) {

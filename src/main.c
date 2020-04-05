@@ -148,18 +148,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
 
     // Spawn each worker thread
-    for (uint16_t thread = 0; thread < eth.app_opt.thd_nr; thread += 1) {
-
-        pthread_attr_init(&eth.app_opt.thd_attr[thread]);
-        pthread_attr_setdetachstate(&eth.app_opt.thd_attr[thread], PTHREAD_CREATE_JOINABLE);
-
-        // Setup and copy default per-thread structures and settings
-        thd_setup(&eth, thread);
-
-        if (thd_init_worker(&eth, thread) != EXIT_SUCCESS)
-            return EXIT_FAILURE;
-
-    }
+    if (thd_spawn_workers(&eth) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
 
     // Wait for worker and stats threads to finish, then clean up
     thd_join_workers(&eth);
