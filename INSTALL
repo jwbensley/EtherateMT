@@ -1,22 +1,20 @@
-/* Perform a "regular" compile */
-
-gcc -o build/etherate_mt src/main.c -lpthread -O3 --std=c11
-
-
-
-/ * Perform a "strict" compile - requires a more recent GCC version,
-    to check for various code issues */
-
-gcc -o build/etherate_mt src/main.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
-
-gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=leak -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract
-
-gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=alignment -fsanitize=thread
-
-# Not supported in GCC version
--fsanitize=pointer-compare -fsanitize=pointer-subtract
-
 /*
+
+  Perform a "regular" compile:
+
+  gcc -o build/etherate_mt src/main.c -lpthread -O3 --std=c11
+
+*/
+
+
+
+/* 
+
+  Perform a "strict" compile - requires a more recent GCC version,
+  to check for various code issues:
+
+  gcc -o build/etherate_mt src/main.c -lpthread -Wall -Werror -pedantic -ftrapv -O3 --std=c11 -Wjump-misses-init -Wlogical-op -Wshadow -Wformat=2 -Wformat-signedness -Wextra -Wdouble-promotion -Winit-self -Wtrampolines -Wcast-qual -Wcast-align -Wwrite-strings
+
   -lpthread
   Compile with support for Pthreads
 
@@ -46,7 +44,7 @@ gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=alignment 
    This option generates traps for signed overflow on addition, subtraction,
    multiplication operations.
 
-  -O3
+   O3:
    With -O, the compiler tries to reduce code size and execution time, without
    performing any optimizations that take a great deal of compilation time.
   -O1 Optimize.  Optimizing compilation takes somewhat more time, and a lot
@@ -133,22 +131,90 @@ gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=alignment 
    about using "const" in declarations and prototypes. Otherwise, it is just a
    nuisance. This is why we did not make -Wall request these warnings.
 
+*/
+
+
+
+/*
+
+  Compile with AddressSanitizer and LeakSanitizer:
+
+  gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=leak -fsanitize=address -fno-omit-frame-pointer -fno-common -fsanitize=bounds -fsanitize=undefined
+
+
+  https://github.com/google/sanitizers/wiki/AddressSanitizer
+  https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer
+
+  -fsanitize=leak
+  Enable GCC LeakSanitizer.
+
   -fsanitize=address
-   Enable AddressSanitizer, a fast memory error detector. Memory access
-   instructions are instrumented to detect out-of-bounds and use-after-free
-   bugs.
-   !! This will not work with Valgrind !!
+  Enable AddressSanitizer.
+  
+  -fno-omit-frame-pointer
+  Leave frame pointers. Allows the fast unwinder to function properly.
+
+  -fno-common
+  Disable generation of common symbols to inspect global variables.
+
+  -fsanitize=float-divide-by-zero
+  Checks for lloating point division by zero.
+
+  -fsanitize=undefined
+  This encompasses many checks as per:
+  https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
 
 */
 
 
 
-/* Perform a "debug" compile - use with tools like val-/call-/cache-grind,
-   GDB, perf etc */
+/*
 
-gcc -o build/etherate_mt src/main.c -lpthread -fstack-protector-all -Og -g --std=c11
+  Compile with ThreadSanitizer:
+
+  gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -fsanitize=thread
+
+  https://github.com/google/sanitizers/wiki/ThreadSanitizerAlgorithm
+
+*/
+
+
 
 /*
+
+  These specific options are not supported in the Ubuntu 18 GCC version:
+
+  -fsanitize=pointer-compare
+  -fsanitize=pointer-subtract
+  -fsanitize=unsigned-integer-overflow
+  -fsanitize=implicit-conversion
+
+   https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+
+   MemorySanitizer is also not support in the Ubuntu 18 GCC version:
+
+  Compile with MemorySanitixer:
+
+  gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror  -fsanitize=memory -fsanitize-memory-track-origins
+
+  https://github.com/google/sanitizers/wiki/MemorySanitizer
+
+  -fsanitize=memory 
+  Enable MemorySanitizer.
+
+  -fsanitize-memory-track-origins
+  Track back each uninitialized value to the memory allocation where it was created.
+
+*/
+
+
+
+/*
+
+  Perform a "debug" compile - use with tools like val-/call-/cache-grind,
+  GDB, perf etc
+
+  gcc -o build/etherate_mt src/main.c -lpthread -fstack-protector-all -Og -g --std=c11
 
   -fstack-protector-all
    Like -fstack-protector except that all functions are protected.
