@@ -36,7 +36,7 @@ fi
 
 
 
-gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -O0 -g -fsanitize=leak -fsanitize=address
+gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -O0 -g -fsanitize=leak -fsanitize=address -fno-omit-frame-pointer  -fno-common -fsanitize=bounds -fsanitize=undefined
 
 if [ $? -ne 0 ]
 then
@@ -54,7 +54,7 @@ fi
 
 
 
-gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -O0 -g -fsanitize=alignment -fsanitize=thread
+gcc -o build/etherate_mt src/main.c -pthread -Wall -Werror -O0 -g -fsanitize=thread
 
 if [ $? -ne 0 ]
 then
