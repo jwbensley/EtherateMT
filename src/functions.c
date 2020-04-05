@@ -647,23 +647,6 @@ void signal_handler(int signal) {
 
     printf("Quitting...\n");
 
-
-    // Cancel worker threads and join them
-    for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread += 1) {
-
-        int32_t pcancel = pthread_cancel(eth->app_opt.thd[thread]);
-        if (pcancel != 0)
-            printf(
-                "Can't cancel worker thread %" PRIu32
-                ", returned %" PRId32 "\n",
-                eth->thd_opt[thread].thd_id, pcancel
-            );
-
-        void *thd_ret = NULL;
-        pthread_join(eth->app_opt.thd[thread], &thd_ret);
-
-    }
-
     // Cancel the stats thread and join it
     int32_t pcancel = pthread_cancel(eth->app_opt.thd[eth->app_opt.thd_nr]);
     if (pcancel != 0) {
@@ -675,6 +658,22 @@ void signal_handler(int signal) {
 
     void *thd_ret = NULL;
     pthread_join(eth->app_opt.thd[eth->app_opt.thd_nr], &thd_ret);
+
+    // Cancel worker threads and join them
+    for(uint16_t thread = 0; thread < eth->app_opt.thd_nr; thread += 1) {
+
+        pcancel = pthread_cancel(eth->app_opt.thd[thread]);
+        if (pcancel != 0)
+            printf(
+                "Can't cancel worker thread %" PRIu32
+                ", returned %" PRId32 "\n",
+                eth->thd_opt[thread].thd_id, pcancel
+            );
+
+        thd_ret = NULL;
+        pthread_join(eth->app_opt.thd[thread], &thd_ret);
+
+    }
 
     etherate_cleanup(eth);
     exit(signal);

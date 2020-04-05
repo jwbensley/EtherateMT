@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 
 # By defualt, if a command exits before the timeout duration expires, the exit
@@ -44,7 +44,7 @@ then
     exit 1
 fi
 
-sudo timeout --preserve-status 5 ./build/etherate_mt -I 3 -x
+sudo timeout --preserve-status 5 ./build/etherate_mt -I 3
 
 if [ $? -ne 143 ]
 then
@@ -62,7 +62,7 @@ then
     exit 1
 fi
 
-sudo timeout --preserve-status 5 ./build/etherate_mt -I 3 -x
+sudo timeout --preserve-status 5 ./build/etherate_mt -I 3
 
 if [ $? -ne 143 ]
 then
