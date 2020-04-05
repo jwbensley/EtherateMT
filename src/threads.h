@@ -47,7 +47,7 @@ static void thd_join_stats(struct etherate *eth);
 static void thd_join_workers(struct etherate *eth);
 
 // Copy settings into a new worker thread
-static void thd_setup(struct etherate *eth, uint16_t thread);
+static int32_t thd_setup(struct etherate *eth, uint16_t thread);
 
 // Print a custom message with the errno text and thread ID of the calling thread
 static void tperror(struct thd_opt *thd_opt, const char *msg);

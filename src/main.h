@@ -148,7 +148,7 @@ struct thd_opt {
     uint8_t  started;         // Has Tx or Rx loop started?
     uint8_t  stalling;        // Socket is returning ENOBUFS
     uint32_t thd_id;          // Thread ID of "this" thread
-    uint16_t thd_nr;          // If >1, joing a FANOUT group
+    uint16_t thd_nr;          // If >1, join a FANOUT group
     void     *thd_ret;        // Thread exit status
     int32_t  tpacket_ver;     // TPACKET_V2 || TPACKET_V3
     void     *tpacket_req3;   // TPACKET V3
